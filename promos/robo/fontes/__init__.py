@@ -1,0 +1,1 @@
+"""Conectores das lojas."""
