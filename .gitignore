@@ -1,0 +1,15 @@
+# Segredos: nunca sobem para o GitHub
+.env
+promos/.env
+# Banco local e demo
+promos/dados/*.db
+promos/dados/*.db-journal
+promos/dados/demo_*
+promos/dados/diagnostico_*
+promos/dados/perfil_navegador/
+promos/dados/log.txt
+# Python
+__pycache__/
+*.pyc
+.venv/
+.idea/
