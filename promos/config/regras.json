@@ -1,0 +1,44 @@
+{
+  "_leia": "Limites do robo. Percentuais em %, precos em reais. Edite a vontade; nao precisa mexer no codigo.",
+
+  "sinais": {
+    "desconto_loja_min_pct": 15,
+    "abaixo_do_sugerido_min_pct": 15,
+    "entre_lojas_min_pct": 10,
+    "historico_min_dias": 7,
+    "historico_min_pct": 10
+  },
+
+  "_leia_lojas": "Lojas que o robo coleta. Opcoes: shopee, amazon, mercadolivre, eshop.",
+  "lojas_ativas": ["shopee", "amazon", "mercadolivre"],
+
+  "_leia_amazon": "amazon_pelo_site: true = o robo le o site da Amazon num navegador (sem API). false = usa a Creators API. navegador_visivel: true mostra a janela do navegador enquanto coleta.",
+  "amazon_pelo_site": true,
+  "mercadolivre_pelo_site": true,
+  "navegador_visivel": false,
+
+  "preco_minimo_reais": 30,
+
+  "reputacao": {
+    "shopee": { "exigir_selo": true, "nota_minima": 4.7, "vendas_minimas": 50 },
+    "mercadolivre": { "exigir_selo": true, "nota_minima": 0, "vendas_minimas": 0 },
+    "amazon": { "exigir_selo": true, "nota_minima": 0, "vendas_minimas": 0 },
+    "eshop": { "exigir_selo": false, "nota_minima": 0, "vendas_minimas": 0, "preco_cheio_minimo_reais": 60 },
+    "manual": { "exigir_selo": false, "nota_minima": 0, "vendas_minimas": 0 }
+  },
+
+  "repetir_oferta_apos_horas": 48,
+  "nova_queda_min_pct": 3,
+
+  "coleta": {
+    "intervalo_minutos": 60,
+    "paginas_por_busca": 1,
+    "verificacoes_por_ciclo": 15,
+    "itens_por_pagina": 50,
+    "pausa_entre_chamadas_seg": 1.5
+  },
+
+  "_leia_github": "repo_painel = repositorio PUBLICO que serve a pagina online; pasta_painel = pasta publicada (docs).",
+  "github": { "repo_codigo": "pvgm91/ProjectN", "repo_painel": "pvgm91/ProjectN", "pasta_painel": "docs" },
+  "link_grupo": "https://projectn.com.br/promo"
+}
