@@ -1,0 +1,42 @@
+{
+  "_leia": "O que o robo considera 'universo Nintendo'. Um titulo entra se casar com algum grupo (um termo de 'qualquer' e, se existir, um termo de 'tambem') e nao tiver nenhum termo bloqueado. Acentos e maiusculas sao ignorados.",
+
+  "buscas": [
+    "nintendo switch 2",
+    "jogo switch 2",
+    "jogo nintendo switch",
+    "console nintendo switch",
+    "joy-con",
+    "pro controller switch",
+    "amiibo",
+    "lego super mario",
+    "lego zelda",
+    "lego animal crossing",
+    "microsd express switch 2",
+    "8bitdo switch",
+    "hori switch",
+    "case nintendo switch 2"
+  ],
+
+  "grupos": [
+    { "categoria": "Switch 2", "qualquer": ["switch 2", "switch2"] },
+    { "categoria": "Switch", "qualquer": ["nintendo switch", "switch oled", "switch lite", "joy-con", "joycon", "joy con", "pro controller"] },
+    { "categoria": "amiibo", "qualquer": ["amiibo"] },
+    { "categoria": "LEGO", "qualquer": ["lego"], "tambem": ["mario", "luigi", "zelda", "animal crossing", "pokemon", "donkey kong", "game boy", "nintendo", "bowser", "yoshi", "peach"] },
+    { "categoria": "Acessorios", "qualquer": ["8bitdo", "hori", "powera", "microsd express"], "tambem": ["switch", "nintendo"] },
+    { "categoria": "Nintendo", "qualquer": ["nintendo", "eshop"] }
+  ],
+
+  "bloqueados": [
+    "switch de rede", "switch gigabit", "switch hdmi", "switch kvm", "switch poe",
+    "teclado mecanico", "keycap", "interruptor",
+    "adesivo", "skin adesiva", "capa de celular", "capinha de celular",
+    "usado", "seminovo", "recondicionado", "vitrine",
+    "conta digital", "midia digital compartilhada", "aluguel"
+  ],
+
+  "_leia_produtos": "Opcional, mas e o que liga dois sinais: 'abaixo do preco sugerido' e 'mais barato que nas outras lojas'. Cada produto casa quando o titulo tem TODOS os termos de 'termos'. Preencham com os precos cheios que voces ja conhecem. O exemplo abaixo e ignorado enquanto 'exemplo' for true.",
+  "produtos": [
+    { "exemplo": true, "chave": "mario-kart-world", "nome": "Mario Kart World", "termos": ["mario kart world"], "preco_sugerido_reais": 0 }
+  ]
+}
