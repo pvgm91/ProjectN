@@ -14,12 +14,22 @@ from .base import ErroDaFonte, Item, SemCredenciais, para_centavos
 
 ENDPOINT = "https://open-api.affiliate.shopee.com.br/graphql"
 CODIGO_LIMITE_DE_CHAMADAS = 10030
+CODIGO_ERRO_DO_SISTEMA = 10000     # falha passageira e aleatoria da Shopee
 
 CAMPOS = ("itemId productName priceMin priceMax price sales ratingStar priceDiscountRate "
           "imageUrl shopId shopName shopType productLink offerLink commissionRate")
 
 # shopType: 1 = loja oficial (Mall); 2 e 4 = loja indicada (Star / Star+)
 SELOS = {1: "oficial", 2: "indicada", 4: "indicada"}
+
+# Erros em que nao adianta continuar o ciclo: a chave ou o acesso estao com problema.
+# (Evita as palavras "credenciais"/"expirou"/"recusou" para o aviso nao sugerir 'rodar.bat entrar shopee', que nao existe.)
+DICAS = {
+    10020: ("a Shopee nao aceitou a assinatura. Confira SHOPEE_APP_ID e SHOPEE_SECRET no .env "
+            "(copiados inteiros, sem espacos) e se o relogio do PC esta certo"),
+    10031: "a Shopee negou o acesso a Open API para esta conta",
+    10035: "a conta ainda nao tem permissao na Open API (veja affiliate.shopee.com.br, secao Open API)",
+}
 
 
 def assinar(app_id, secret, corpo, ts):
@@ -62,10 +72,12 @@ def converter(no):
 class Shopee:
     nome = "shopee"
 
-    def __init__(self, env, enviar=None):
-        self.app_id = env.get("SHOPEE_APP_ID", "")
-        self.secret = env.get("SHOPEE_SECRET", "")
+    def __init__(self, env, enviar=None, dormir=None):
+        self.app_id = env.get("SHOPEE_APP_ID", "").strip()
+        self.secret = env.get("SHOPEE_SECRET", "").strip()
         self._enviar = enviar or self._enviar_http   # trocavel nos testes
+        self._dormir = dormir or time.sleep
+        self.bloqueada = False      # True = erro de chave/acesso: a coleta para no ciclo (sem gastar chamadas)
         if not (self.app_id and self.secret):
             raise SemCredenciais("Shopee: preencha SHOPEE_APP_ID e SHOPEE_SECRET no arquivo .env")
 
@@ -73,13 +85,17 @@ class Shopee:
         req = urllib.request.Request(ENDPOINT, data=corpo.encode("utf-8"), headers=cabecalhos)
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                texto = resp.read().decode("utf-8")
         except urllib.error.HTTPError as e:
             raise ErroDaFonte(f"Shopee respondeu HTTP {e.code}: {e.read()[:300]!r}")
         except urllib.error.URLError as e:
             raise ErroDaFonte(f"Shopee inacessivel: {e.reason}")
+        try:
+            return json.loads(texto)
+        except ValueError:
+            raise ErroDaFonte(f"Shopee respondeu algo que nao e JSON: {texto[:200]!r}")
 
-    def chamar(self, consulta, tentativas=3):
+    def chamar(self, consulta, tentativas=4):
         corpo = json.dumps({"query": consulta}, ensure_ascii=False)
         for tentativa in range(tentativas):
             ts = int(time.time())
@@ -90,9 +106,19 @@ class Shopee:
                 return dados.get("data") or {}
             codigo = (erros[0].get("extensions") or {}).get("code")
             if codigo == CODIGO_LIMITE_DE_CHAMADAS and tentativa < tentativas - 1:
-                time.sleep(5 * (tentativa + 1))
+                self._dormir(5 * (tentativa + 1))
                 continue
-            raise ErroDaFonte(f"Shopee erro {codigo}: {erros[0].get('message')}")
+            if codigo == CODIGO_ERRO_DO_SISTEMA and tentativa < tentativas - 1:
+                self._dormir(3 * (tentativa + 1))     # erro passageiro da Shopee (~1 em 10 chamadas): espera e repete
+                continue
+            mensagem = erros[0].get("message") or ""
+            if codigo in DICAS:
+                self.bloqueada = True
+                raise ErroDaFonte(f"Shopee erro {codigo}: {DICAS[codigo]} ({mensagem})")
+            if codigo == CODIGO_LIMITE_DE_CHAMADAS:
+                raise ErroDaFonte(f"Shopee erro {codigo}: limite de chamadas por hora atingido; "
+                                  "tenta de novo na proxima coleta")
+            raise ErroDaFonte(f"Shopee erro {codigo}: {mensagem}")
         return {}
 
     def buscar_bruto(self, palavra, pagina=1, por_pagina=10):
@@ -109,5 +135,5 @@ class Shopee:
                     itens.append(item)
             if not (bloco.get("pageInfo") or {}).get("hasNextPage"):
                 break
-            time.sleep(pausa)
+            self._dormir(pausa)
         return itens
