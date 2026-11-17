@@ -4,6 +4,9 @@
 def aprovado(item, regras):
     """Devolve (True, '') ou (False, motivo)."""
     r = regras.get("reputacao", {}).get(item.loja, {})
+    confiaveis = [v.lower() for v in (regras.get("vendedores_confiaveis") or {}).get(item.loja, [])]
+    if (item.vendedor or "").strip().lower() in confiaveis:      # loja oficial cadastrada a mao (ex.: editora)
+        return True, ""
     if r.get("exigir_selo") and not item.selo:
         return False, "vendedor sem selo (loja oficial ou indicada)"
     nota_min = r.get("nota_minima", 0)

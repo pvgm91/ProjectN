@@ -46,7 +46,7 @@ def _sal_do_painel():
 
 
 def _exportar(con, regras, arquivo):
-    ofertas = db.listar_ofertas(con, "nova")
+    ofertas = db.listar_ofertas(con, "nova", int(regras.get("ofertas_no_painel", 1000)))
     produtos, links_curtos = [], {}
     if arquivo.name == "ofertas.json":
         produtos = exportar.produtos_para_painel(con, db.agora_utc())

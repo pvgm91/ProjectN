@@ -1,6 +1,5 @@
 {
   "_leia": "Limites do robo. Percentuais em %, precos em reais. Edite a vontade; nao precisa mexer no codigo.",
-
   "sinais": {
     "desconto_loja_min_pct": 15,
     "abaixo_do_sugerido_min_pct": 15,
@@ -8,40 +7,75 @@
     "historico_min_dias": 7,
     "historico_min_pct": 10
   },
-
   "_leia_lojas": "Lojas que o robo coleta. Opcoes: shopee, amazon, mercadolivre, eshop.",
-  "lojas_ativas": ["shopee", "amazon", "mercadolivre"],
-
+  "lojas_ativas": [
+    "shopee",
+    "amazon",
+    "mercadolivre"
+  ],
   "_leia_amazon": "amazon_pelo_site: true = o robo le o site da Amazon num navegador (sem API). false = usa a Creators API. navegador_visivel: true mostra a janela do navegador enquanto coleta.",
   "amazon_pelo_site": true,
   "mercadolivre_pelo_site": false,
   "_leia_ml_reputacao": "Mercado Livre: o preco lido e o do vendedor que o proprio ML escolhe para o produto (o vencedor do catalogo, que exige boa reputacao). exigir_selo true = so loja oficial.",
   "_leia_ml_lojas": "Lojas do Mercado Livre preferidas: quando uma delas vende o produto, o post usa o anuncio dela. A chave e o official_store_id que aparece no link da loja.",
-  "mercadolivre_lojas": { "5622": "Gamer Hut" },
+  "mercadolivre_lojas": {
+    "5622": "Gamer Hut"
+  },
   "mercadolivre_resultados_por_busca": 60,
   "_leia_ml_site": "Mercado Livre pelo site, com login no navegador do robo (rodar.bat entrar mercadolivre-site). buscas = pesquisas lidas no site; so_lojas true = guarda so anuncios das lojas de mercadolivre_lojas; conferir_cupons = procura os cupons do Telegram na pagina de cupons da conta.",
-  "mercadolivre_site": { "ativo": true, "buscas": ["switch game hut"], "paginas": 2, "so_lojas": true, "conferir_cupons": true, "navegador": "chrome" },
-  "_leia_ml_afiliado": "Identificacao de afiliado do Mercado Livre, acrescentada ao link de cada produto da lista.",
-  "mercadolivre_afiliado": { "matt_word": "projectn", "matt_tool": "75936721" },
-  "navegador_visivel": false,
-
-  "_leia_jogos": "Jogos de config/jogos.txt procurados pelo nome. jogos_por_ciclo = quantos da fila cada loja procura por coleta (rodizio). Amazon baixo para nao pedir CAPTCHA.",
-  "jogos_por_ciclo": { "amazon": 24, "mercadolivre": 100 },
-  "resultados_por_jogo": 10,
-
-  "preco_minimo_reais": 30,
-
-  "reputacao": {
-    "shopee": { "exigir_selo": true, "nota_minima": 4.7, "vendas_minimas": 50 },
-    "mercadolivre": { "exigir_selo": false, "nota_minima": 0, "vendas_minimas": 0 },
-    "amazon": { "exigir_selo": true, "nota_minima": 0, "vendas_minimas": 0 },
-    "eshop": { "exigir_selo": false, "nota_minima": 0, "vendas_minimas": 0, "preco_cheio_minimo_reais": 60 },
-    "manual": { "exigir_selo": false, "nota_minima": 0, "vendas_minimas": 0 }
+  "mercadolivre_site": {
+    "ativo": true,
+    "buscas": [
+      "switch game hut"
+    ],
+    "paginas": 2,
+    "so_lojas": true,
+    "conferir_cupons": true,
+    "navegador": "chrome"
   },
-
+  "_leia_ml_afiliado": "Identificacao de afiliado do Mercado Livre, acrescentada ao link de cada produto da lista.",
+  "mercadolivre_afiliado": {
+    "matt_word": "projectn",
+    "matt_tool": "75936721"
+  },
+  "navegador_visivel": false,
+  "_leia_jogos": "Jogos de config/jogos.txt procurados pelo nome. jogos_por_ciclo = quantos da fila cada loja procura por coleta (rodizio). Amazon baixo para nao pedir CAPTCHA.",
+  "jogos_por_ciclo": {
+    "amazon": 24,
+    "mercadolivre": 100
+  },
+  "resultados_por_jogo": 10,
+  "preco_minimo_reais": 30,
+  "reputacao": {
+    "shopee": {
+      "exigir_selo": true,
+      "nota_minima": 4.7,
+      "vendas_minimas": 50
+    },
+    "mercadolivre": {
+      "exigir_selo": false,
+      "nota_minima": 0,
+      "vendas_minimas": 0
+    },
+    "amazon": {
+      "exigir_selo": true,
+      "nota_minima": 0,
+      "vendas_minimas": 0
+    },
+    "eshop": {
+      "exigir_selo": false,
+      "nota_minima": 0,
+      "vendas_minimas": 0,
+      "preco_cheio_minimo_reais": 60
+    },
+    "manual": {
+      "exigir_selo": false,
+      "nota_minima": 0,
+      "vendas_minimas": 0
+    }
+  },
   "repetir_oferta_apos_horas": 48,
   "nova_queda_min_pct": 3,
-
   "coleta": {
     "intervalo_minutos": 60,
     "paginas_por_busca": 1,
@@ -49,12 +83,45 @@
     "itens_por_pagina": 50,
     "pausa_entre_chamadas_seg": 1.5
   },
-
   "_leia_github": "repo_painel = repositorio PUBLICO que serve a pagina online; pasta_painel = pasta publicada (docs).",
-  "github": { "repo_codigo": "pvgm91/ProjectN", "repo_painel": "pvgm91/ProjectN", "pasta_painel": "docs" },
+  "github": {
+    "repo_codigo": "pvgm91/ProjectN",
+    "repo_painel": "pvgm91/ProjectN",
+    "pasta_painel": "docs"
+  },
   "_leia_links_curtos": "Links curtos do Project N no post. dominio vazio = endereco do GitHub (funciona ja). Depois de configurar o DNS, coloque promo.projectn.com.br.",
-  "links_curtos": { "ativo": true, "dominio": "promo.projectn.com.br" },
+  "links_curtos": {
+    "ativo": true,
+    "dominio": "promo.projectn.com.br"
+  },
   "_leia_cupons": "Grupos/canais do Telegram de onde ler cupons (nome como aparece no Telegram, @usuario ou link t.me). Precisa de 'rodar.bat entrar telegram' uma vez.",
-  "cupons_telegram": { "loja_do_canal": { "Afiliados e Criadores Mercado Livre Brasil 🇧🇷": "mercadolivre" }, "lojas": ["amazon", "mercadolivre", "shopee"], "canais": ["Ofertas Nintendo BR 🇧🇷", "Canaltech Ofertas | Tecnologia", "Afiliados e Criadores Mercado Livre Brasil 🇧🇷"], "horas_no_painel": 3, "horas_para_tras": 6, "mensagens_por_canal": 200 },
-  "link_grupo": "https://projectn.com.br/promo"
+  "cupons_telegram": {
+    "loja_do_canal": {
+      "Afiliados e Criadores Mercado Livre Brasil 🇧🇷": "mercadolivre"
+    },
+    "lojas": [
+      "amazon",
+      "mercadolivre",
+      "shopee"
+    ],
+    "canais": [
+      "Ofertas Nintendo BR 🇧🇷",
+      "Canaltech Ofertas | Tecnologia",
+      "Afiliados e Criadores Mercado Livre Brasil 🇧🇷"
+    ],
+    "horas_no_painel": 3,
+    "horas_para_tras": 6,
+    "mensagens_por_canal": 200
+  },
+  "link_grupo": "https://projectn.com.br/promo",
+  "_leia_ofertas_no_painel": "Quantas ofertas abertas vao para a pagina (as de maior desconto primeiro). Antes era fixo em 100.",
+  "ofertas_no_painel": 1000,
+  "_leia_vendedores_confiaveis": "Vendedores sem selo que voces aprovam a mao (nome exatamente como aparece no painel). Passam direto no filtro de reputacao.",
+  "vendedores_confiaveis": {
+    "amazon": [
+      "Europanet"
+    ],
+    "mercadolivre": [],
+    "shopee": []
+  }
 }
