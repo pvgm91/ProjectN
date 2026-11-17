@@ -65,12 +65,15 @@ def enviar_arquivo(token, repo, caminho, conteudo, mensagem, sha_remoto=None, en
 
 
 def arquivos_do_projeto(raiz):
-    """Arquivos que podem ir para o repositorio. Nunca inclui .env, banco ou perfil do navegador."""
+    """Arquivos que podem ir para o repositorio. Nunca inclui .env, banco, perfil do navegador nem a pasta docs
+    (o painel tem milhares de links curtos; mandados um a um, travavam o GitHub Pages)."""
     raiz = Path(raiz)
     achados = []
     for p in sorted(raiz.rglob("*")):
         rel = p.relative_to(raiz)
         if not p.is_file() or PASTAS_FORA & set(rel.parts[:-1]):
+            continue
+        if rel.parts[0] == "docs":      # painel e links curtos: quem envia e o 'publicar', num commit so
             continue
         if p.name == ".env" or p.name.startswith(".env.") and p.name != ".env.example":
             continue
