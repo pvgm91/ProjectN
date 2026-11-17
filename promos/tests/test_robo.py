@@ -332,7 +332,7 @@ class GitHub(unittest.TestCase):
                 (raiz / rel).parent.mkdir(parents=True, exist_ok=True)
                 (raiz / rel).write_text("x")
             self.assertEqual(github.arquivos_do_projeto(raiz),
-                             [".gitignore", "docs/index.html", "promos/.env.example", "promos/robo/a.py"])
+                             [".gitignore", "promos/.env.example", "promos/robo/a.py"])
 
     def test_prepara_a_pagina_uma_vez(self):
         from robo import github
