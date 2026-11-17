@@ -8,6 +8,7 @@ promos/dados/demo_*
 promos/dados/diagnostico_*
 promos/dados/perfil_navegador/
 promos/dados/log.txt
+promos/dados/ml_token.json
 # Python
 __pycache__/
 *.pyc
