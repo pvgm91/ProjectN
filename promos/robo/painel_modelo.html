@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Radar de Preços · Project N</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: cabecalho fixo com tres abas (Ofertas, Produtos, ficha do produto).
+   Ofertas em cartoes; Produtos em lista densa com mini grafico; ficha com grafico grande. */
+:root {
+  --bg: #f5f2f2; --surface: #ffffff; --sunk: #efeaea; --ink: #1c1416; --muted: #6e6265; --line: #e4dcdd;
+  --accent: #d0021b; --accent-ink: #ffffff; --accent-soft: #fbe7ea;
+  --good: #137347; --good-soft: #e1f2e9; --warn: #8a5300; --warn-soft: #fbefd8; --off: #5b5658; --off-soft: #ece8e8;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #131011; --surface: #1d1819; --sunk: #181415; --ink: #f2ecec; --muted: #a39799; --line: #332a2c;
+  --accent: #ff4b5f; --accent-ink: #1a0709; --accent-soft: #3a171d;
+  --good: #5cd197; --good-soft: #15301f; --warn: #f0b955; --warn-soft: #362812; --off: #b3aaac; --off-soft: #2a2425;
+  color-scheme: dark; } }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html, body { margin: 0 }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--body); -webkit-text-size-adjust: 100% }
+button, input, select { font: inherit; color: inherit }
+a { color: inherit }
+.wrap { max-width: 1320px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+
+header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top, 0px) }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding-block: 14px 8px }
+.marca { font: 700 20px/1.1 var(--display); letter-spacing: -0.01em; margin: 0 }
+.marca b { color: var(--accent) }
+.atualizado { color: var(--muted); font-size: 12px }
+.sair { border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 12px; padding: 0 0 0 6px }
+nav { display: flex; gap: 2px }
+nav a { text-decoration: none; padding: 9px 12px 10px; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent }
+nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent) }
+nav a span { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--muted) }
+
+main { padding-block: 16px 64px }
+.barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px }
+.busca { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface) }
+select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); max-width: 100% }
+.chips { display: flex; flex-wrap: wrap; gap: 6px }
+.chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 500 }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.chip span { font-variant-numeric: tabular-nums; opacity: .7 }
+.marcar { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer }
+.contagem { color: var(--muted); font-size: 12px; margin: -4px 0 10px }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+/* Ofertas */
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0 }
+.oferta { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px }
+.oferta.apagada { opacity: .55 }
+.foto { width: 84px; height: 84px; border-radius: 8px; background: #fff; object-fit: contain; border: 1px solid var(--line) }
+.cat { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted) }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; letter-spacing: .02em }
+.pill.valendo { background: var(--good-soft); color: var(--good) }
+.pill.subiu, .pill.semlink { background: var(--warn-soft); color: var(--warn) }
+.pill.sumiu, .pill.postada { background: var(--off-soft); color: var(--off) }
+.pill.menor { background: var(--accent-soft); color: var(--accent) }
+h2.titulo { font: 600 15px/1.3 var(--body); margin: 4px 0 6px; overflow-wrap: anywhere }
+.preco { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-variant-numeric: tabular-nums }
+.preco strong { font: 700 22px/1.1 var(--display) }
+.preco s { color: var(--muted) }
+.desc { font: 700 13px/1 var(--display); color: var(--accent-ink); background: var(--accent); padding: 4px 6px; border-radius: 5px }
+.meta { color: var(--muted); font-size: 12px; margin-top: 4px; overflow-wrap: anywhere }
+.acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-weight: 600; font-size: 13px; text-decoration: none; line-height: 1 }
+.btn:hover { border-color: var(--muted) }
+.btn.forte { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.vazio { color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; padding: 28px; text-align: center }
+textarea.copia { width: 100%; min-height: 160px; margin-top: 8px; font: 12px/1.4 ui-monospace, Consolas, monospace;
+  background: var(--sunk); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px }
+
+/* Produtos */
+.lista { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden }
+.linha { display: grid; grid-template-columns: 48px minmax(0, 1fr) 120px 150px; gap: 12px; align-items: center;
+  padding: 10px 14px; border-top: 1px solid var(--line); text-decoration: none }
+.linha:first-child { border-top: 0 }
+.linha:hover { background: var(--sunk) }
+.linha .foto { width: 48px; height: 48px; border-radius: 6px }
+.linha .nome { font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+.linha .valor { text-align: right; font-variant-numeric: tabular-nums }
+.linha .valor strong { font: 700 16px/1.2 var(--display); display: block }
+.var { font-size: 12px; font-weight: 600 }
+.var.baixo { color: var(--good) } .var.alto { color: var(--warn) } .var.neutro { color: var(--muted) }
+svg.spark { width: 120px; height: 34px; display: block }
+@media (max-width: 640px) {
+  .linha { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .linha svg.spark { display: none }
+  .oferta { grid-template-columns: 64px minmax(0, 1fr) } .oferta .foto { width: 64px; height: 64px }
+}
+.mais { display: flex; justify-content: center; margin-top: 12px }
+
+/* Ficha */
+.voltar { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); text-decoration: none; font-weight: 600; margin-bottom: 12px }
+.ficha { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 20px; align-items: start }
+.ficha .foto { width: 160px; height: 160px }
+@media (max-width: 640px) { .ficha { grid-template-columns: minmax(0, 1fr) } .ficha .foto { width: 120px; height: 120px } }
+.ficha h1 { font: 700 22px/1.2 var(--display); margin: 4px 0 10px; text-wrap: balance; overflow-wrap: anywhere }
+.numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 18px 0 }
+.numeros div { background: var(--surface); padding: 10px 12px }
+.numeros dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted) }
+.numeros dd { margin: 2px 0 0; font: 700 17px/1.2 var(--display); font-variant-numeric: tabular-nums }
+.numeros dd small { display: block; font: 500 11px/1.4 var(--body); color: var(--muted) }
+@media (max-width: 520px) { .numeros { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.caixa { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px }
+.caixa h3 { font: 700 13px/1.2 var(--display); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px }
+.grafico { width: 100%; height: auto; display: block; overflow: visible }
+.grafico text { fill: var(--muted); font: 11px var(--body) }
+.nota { color: var(--muted); font-size: 12px; margin: 8px 0 0 }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+td, th { padding: 6px 4px; border-top: 1px solid var(--line); text-align: left; font-size: 13px }
+th { color: var(--muted); font-weight: 500; font-size: 12px; border-top: 0 }
+td.n, th.n { text-align: right }
+@media (prefers-reduced-motion: no-preference) { .oferta, .linha { transition: background .12s } }
+/* Cupons */
+.codigo { font: 700 17px/1.2 ui-monospace, Consolas, monospace; border: 2px dashed var(--accent); color: var(--accent);
+  border-radius: 8px; padding: 10px 8px; text-align: center; overflow-wrap: anywhere; background: var(--accent-soft) }
+.secao-loja { margin-bottom: 26px }
+.secao-titulo { font: 700 18px/1.2 var(--display); margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline;
+  padding-left: 10px; border-left: 4px solid var(--loja, var(--muted)) }
+.secao-titulo span { font: 500 12px/1.4 var(--body); color: var(--muted) }
+.loja-amazon { --loja: #ff9900 } .loja-mercadolivre { --loja: #ffe600 } .loja-shopee { --loja: #ee4d2d }
+.cupons-grade { grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)) }
+.cupom-card { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--loja, var(--line)); border-radius: 12px;
+  padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+.cupom-regras { display: flex; flex-wrap: wrap; gap: 6px }
+.chip-regra { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line) }
+.cupons-caixa { margin-top: 10px; border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; background: var(--sunk) }
+.cupons-caixa > summary { cursor: pointer; font-weight: 600; font-size: 13px }
+.cupons-caixa[open] > summary { margin-bottom: 6px }
+.cupons-lista { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.cp-linha { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; cursor: pointer; font-size: 13px }
+.cp-codigo { font: 700 13px/1.2 ui-monospace, Consolas, monospace; color: var(--accent) }
+.cp-regra { color: var(--muted) }
+.cp-ok { color: var(--good); font-weight: 600 } .cp-nao { color: var(--muted); font-style: italic }
+.pill.confirmado { background: #e6f0ff; color: #1d4ed8 }
+.cp-oficial { margin: 4px 0 0 24px; font-size: 12px; color: #1d4ed8 }
+body:has(.barra-selecao:not([hidden])) main { padding-bottom: 90px }
+.com-lateral { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: start }
+.lateral { position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px }
+.lateral h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #777); margin: 4px 8px 8px }
+.lateral ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px }
+.lat-item { width: 100%; display: flex; justify-content: space-between; gap: 8px; border: 0; background: none; color: inherit;
+  font: inherit; text-align: left; padding: 7px 10px; border-radius: 8px; cursor: pointer }
+.lat-item:hover { background: var(--accent-soft) }
+.lat-item.ativo { background: var(--accent); color: var(--accent-ink); font-weight: 600 }
+.lat-n { opacity: .7; font-variant-numeric: tabular-nums }
+@media (max-width: 760px) {
+  .com-lateral { grid-template-columns: minmax(0, 1fr) }
+  .lateral { position: static; padding: 6px; overflow-x: auto }
+  .lateral h3 { display: none }
+  .lateral ul { display: flex; gap: 6px; width: max-content }
+  .lat-item { white-space: nowrap; border: 1px solid var(--line) }
+}
+.pill.importado { background: #e6f0ff; color: #1d4ed8 }
+.pill.desc-pill { background: var(--accent); color: var(--accent-ink) }
+.btn.remover, .btn.rm-mini { color: var(--off) }
+.btn.armado { background: var(--off); color: #fff; border-color: var(--off) }
+.btn.rm-mini { font-size: 13px }
+.aviso-rm { background: var(--off-soft); padding: 8px 12px; border-radius: 8px }
+.sel-aviso { color: var(--accent) }
+.btn.outra-loja { opacity: .35 }
+.lista li.selecionavel { display: flex; align-items: center; gap: 8px }
+.lista li.selecionavel > a { flex: 1; min-width: 0 }
+.btn.sel-mini { width: 32px; height: 32px; padding: 0; font-size: 16px; flex: none }
+.barra-selecao { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 10px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 8px 10px 8px 18px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.18); max-width: calc(100vw - 32px); font-weight: 600 }
+.combo-lista { margin: 8px 0; padding-left: 22px; display: grid; gap: 6px; max-height: 260px; overflow: auto }
+.combo-lista li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; font-size: 13px }
+.combo-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.combo-bts { display: flex; gap: 4px }
+#combo-titulo, #combo-obs { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink) }
+.cp-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0 24px }
+.btn.mini { padding: 5px 8px; font-size: 12px }
+.btn.marcado-ok { background: var(--good-soft); color: var(--good); border-color: var(--good) }
+.btn.marcado-nao { background: var(--off-soft); color: var(--off); border-color: var(--off) }
+.cp-funcionou { background: var(--good-soft); border-radius: 8px; padding: 4px 6px }
+.cupom-card.apagada { opacity: .55 }
+.cp-msg summary { font-size: 12px; color: var(--muted); cursor: pointer } .cp-msg p { font-size: 12px; color: var(--muted); margin: 4px 0 0 }
+/* Tela de senha */
+.cofre { max-width: 360px; margin: 12vh auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 24px; display: flex; flex-direction: column; gap: 10px }
+.cofre h1 { font: 700 22px/1.2 var(--display); margin: 0 }
+.cofre label { font-size: 13px; font-weight: 600 }
+.cofre input[type=password] { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg) }
+.cofre .erro { color: var(--accent); font-size: 13px; margin: 0 }
+.cofre .btn { justify-content: center; padding: 11px }
+/* Gerador de arte */
+dialog.arte { border: 0; padding: 0; border-radius: 14px; background: var(--surface); color: var(--ink);
+  width: min(980px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+dialog.arte::backdrop { background: rgba(10, 6, 7, .62) }
+.arte-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line) }
+.arte-topo h2 { font: 700 17px/1.2 var(--display); margin: 0 }
+.arte-corpo { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; padding: 18px; overflow: auto; max-height: calc(100dvh - 90px) }
+@media (max-width: 720px) { .arte-corpo { grid-template-columns: minmax(0, 1fr) } }
+.arte-tela { width: 100%; aspect-ratio: 1; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #fff;
+  touch-action: none; cursor: grab; display: block }
+.arte-tela:active { cursor: grabbing }
+.arte-lado { display: flex; flex-direction: column; gap: 14px; min-width: 0 }
+.arte-lado label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; gap: 6px }
+.arte-lado input[type=range] { width: 100%; accent-color: var(--accent) }
+.arte-aviso { font-size: 13px; padding: 10px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn) }
+.arte-ok { font-size: 13px; padding: 10px 12px; border-radius: 8px; background: var(--good-soft); color: var(--good) }
+.arte-dica { font-size: 12px; color: var(--muted); margin: 0 }
+.fechar { border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 4px 8px }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <p class="marca"><b>Project N</b> · Radar de preços</p>
+      <span class="atualizado"><span id="atualizado"></span> <button type="button" class="sair" id="sair" hidden>Sair</button></span>
+    </div>
+    <nav aria-label="Seções">
+      <a href="#ofertas" id="nav-ofertas">Ofertas <span id="n-ofertas"></span></a>
+      <a href="#novidades" id="nav-novidades">Novidades <span id="n-novidades"></span></a>
+      <a href="#produtos" id="nav-produtos">Produtos <span id="n-produtos"></span></a>
+      <a href="#cupons" id="nav-cupons">Cupons <span id="n-cupons"></span></a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="tela"></main>
+
+<script type="application/json" id="dados">__DADOS__</script>
+<script>
+function iniciarPainel(D) {
+  "use strict";
+  var LOJAS = { amazon: "Amazon", shopee: "Shopee", mercadolivre: "Mercado Livre", eshop: "Nintendo eShop", manual: "Manual" };
+  var PRODUTOS = D.produtos || [];
+  var CUPONS = D.cupons || [];
+  var LOJAS_CUPOM = { amazon: "Amazon", mercadolivre: "Mercado Livre", shopee: "Shopee", magalu: "Magalu", kabum: "KaBuM!",
+    aliexpress: "AliExpress", nuuvem: "Nuuvem", eshop: "Nintendo eShop", "": "Loja não identificada" };
+  function precoComCupom(preco, c) {
+    if (c.minimo_cent && preco < c.minimo_cent) return null;
+    var d = c.desconto_cent || (c.desconto_pct ? Math.round(preco * c.desconto_pct / 100) : 0);
+    if (!d) return null;
+    if (c.teto_cent) d = Math.min(d, c.teto_cent);
+    return Math.max(0, preco - d);
+  }
+  function melhorCupom(loja, preco) {
+    var melhor = null;
+    CUPONS.forEach(function (c) {
+      if (c.loja !== loja) return;
+      var f = precoComCupom(preco, c);
+      if (f != null && (!melhor || f < melhor.final)) melhor = { cupom: c, final: f };
+    });
+    return melhor;
+  }
+  function regrasDoCupom(c) {
+    var r = [];
+    if (c.desconto_pct) r.push(c.desconto_pct + "% OFF");
+    if (c.desconto_cent) r.push(R(c.desconto_cent) + " OFF");
+    if (c.teto_cent) r.push("limite " + R(c.teto_cent));
+    if (c.minimo_cent) r.push("mínimo " + R(c.minimo_cent));
+    if (c.validade) r.push("até " + c.validade.split("-").reverse().slice(0, 2).join("/"));
+    return r;
+  }
+  // Resultado dos testes de cupom (neste navegador): "ok" = funcionou, "nao" = nao funcionou
+  var testes = ler("pn_testes", {});
+  function seloOficial(c) {
+    return c.confirmado_em ? h("span", { class: "pill confirmado", title: c.regra_oficial || "", texto: "✔ Confirmado no " + (LOJAS[c.loja] || c.loja) }) : null;
+  }
+  function textoOficial(c) {
+    return c.regra_oficial ? h("p", { class: "cp-oficial", texto: "Na página de cupons do " + (LOJAS[c.loja] || c.loja) + ": " + c.regra_oficial }) : null;
+  }
+  function chaveCupom(c) { return c.loja + "|" + c.codigo; }
+  function resultado(c) { return (testes[chaveCupom(c)] || {}).r || ""; }
+  function marcarTeste(c, r) {
+    if (!r || resultado(c) === r) delete testes[chaveCupom(c)]; else testes[chaveCupom(c)] = { r: r, t: Date.now() };
+    guardar("pn_testes", testes);
+  }
+  function cuponsDaLoja(loja) { return CUPONS.filter(function (c) { return c.loja === loja && resultado(c) !== "nao"; }); }
+  function copiarTexto(t) { try { return navigator.clipboard.writeText(t); } catch (e) { return Promise.reject(e); } }
+  function botoesTeste(c, aoMudar) {
+    var ok = h("button", { class: "btn mini" + (resultado(c) === "ok" ? " marcado-ok" : ""), type: "button", title: "Funcionou",
+      "aria-pressed": String(resultado(c) === "ok"), texto: "✓ Funcionou" });
+    var nao = h("button", { class: "btn mini" + (resultado(c) === "nao" ? " marcado-nao" : ""), type: "button", title: "Não funcionou",
+      "aria-pressed": String(resultado(c) === "nao"), texto: "✗ Não funcionou" });
+    ok.addEventListener("click", function () { marcarTeste(c, "ok"); aoMudar(); redesenharCaixas(aoMudar); });
+    nao.addEventListener("click", function () { marcarTeste(c, "nao"); aoMudar(); redesenharCaixas(aoMudar); });
+    return [ok, nao];
+  }
+  // Linhas do cupom no texto do post, logo antes do link
+  function textoComCupons(texto, preco, escolhidos) {
+    if (!escolhidos.length) return texto;
+    var linhas = escolhidos.map(function (c) {
+      var f = precoComCupom(preco, c), r = regrasDoCupom(c).filter(function (x) { return x.indexOf("até") !== 0; });
+      return "🎟️ Cupom *" + c.codigo + "*" + (r.length ? " (" + r.join(", ") + ")" : "") + (f != null ? " → sai por *" + R(f) + "*" : "");
+    });
+    var partes = texto.split("\n"), k = partes.findIndex(function (l) { return l.indexOf("👉") === 0; });
+    if (k < 0) k = partes.length;
+    while (k > 0 && partes[k - 1] === "") k--;
+    partes.splice(k, 0, "", linhas.join("\n"));
+    return partes.join("\n");
+  }
+  // Caixa "Cupons da loja" embaixo da oferta: cada cupom com regra, preco estimado e caixinha para incluir no post
+  // Caixas de cupons abertas na tela: quando um cupom e marcado, todas se atualizam
+  var caixasVivas = [];
+  function redesenharCaixas(exceto) {
+    caixasVivas = caixasVivas.filter(function (x) { return x.el.isConnected; });
+    caixasVivas.forEach(function (x) { if (x.f !== exceto) x.f(); });
+  }
+  function caixaCupons(loja, preco, escolhidos, urlLoja) {
+    var caixa = h("details", { class: "cupons-caixa" });
+    function desenhar() {
+      var aberta = caixa.open;
+      caixa.textContent = "";
+      var lista = cuponsDaLoja(loja).map(function (c) { return { c: c, f: precoComCupom(preco, c) }; })
+        .sort(function (a, b) {
+          return (resultado(b.c) === "ok") - (resultado(a.c) === "ok") || !!b.c.confirmado_em - !!a.c.confirmado_em ||
+            (a.f == null) - (b.f == null) || (a.f || 0) - (b.f || 0);
+        });
+      var descartados = CUPONS.filter(function (c) { return c.loja === loja && resultado(c) === "nao"; }).length;
+      caixa.hidden = !lista.length && !descartados;
+      if (caixa.hidden) return;
+      var melhor = lista.filter(function (x) { return x.f != null; })[0];
+      caixa.appendChild(h("summary", null, ["🎟️ " + lista.length + (lista.length === 1 ? " cupom " : " cupons ") + (LOJAS[loja] || loja),
+        melhor ? h("span", { class: "cp-ok", texto: " · melhor: " + melhor.c.codigo + " → " + R(melhor.f) }) : null]));
+      caixa.appendChild(h("p", { class: "meta", texto: "\"Testar\" copia o código e abre o produto: cole o código no carrinho ou no pagamento e marque o resultado. Marque os cupons que quer incluir no texto do post." }));
+      caixa.appendChild(h("ul", { class: "cupons-lista" }, lista.map(function (x) {
+        var c = x.c, id = "cp-" + Math.random().toString(36).slice(2, 9);
+        var marca = h("input", { type: "checkbox", id: id });
+        marca.checked = escolhidos.indexOf(c) >= 0;
+        marca.addEventListener("change", function () {
+          var k = escolhidos.indexOf(c);
+          if (marca.checked && k < 0) escolhidos.push(c); else if (!marca.checked && k >= 0) escolhidos.splice(k, 1);
+        });
+        var situacao = x.f != null ? h("span", { class: "cp-ok", texto: "sai por " + R(x.f) })
+          : c.minimo_cent && preco < c.minimo_cent ? h("span", { class: "cp-nao", texto: "não atinge o mínimo" })
+          : h("span", { class: "cp-nao", texto: "regra na mensagem" });
+        var testar = h("a", { class: "btn mini forte", href: urlLoja || "#", target: "_blank", rel: "noopener", texto: "Testar" });
+        testar.addEventListener("click", function () { copiarTexto(c.codigo).catch(function () {}); testar.textContent = "Código copiado"; });
+        if (!urlLoja) testar.hidden = true;
+        return h("li", { class: resultado(c) === "ok" ? "cp-funcionou" : "" }, [
+          h("label", { for: id, class: "cp-linha" }, [marca, h("span", { class: "cp-codigo", texto: c.codigo }),
+            resultado(c) === "ok" ? h("span", { class: "pill valendo", texto: "Funcionou" }) : null, seloOficial(c),
+            h("span", { class: "cp-regra", texto: regrasDoCupom(c).join(" · ") || "sem regra identificada" }), situacao]),
+          h("div", { class: "cp-acoes" }, [testar].concat(botoesTeste(c, desenhar))),
+          textoOficial(c),
+          h("details", { class: "cp-msg" }, [h("summary", { texto: "ver mensagem" }), h("p", { texto: (c.origem ? c.origem + ": " : "") + c.texto })])]);
+      })));
+      if (descartados) caixa.appendChild(h("p", { class: "meta", texto: descartados + " cupom(ns) marcado(s) como \"não funcionou\" escondido(s). Para trazer de volta, use a aba Cupons." }));
+      caixa.open = aberta;
+    }
+    desenhar();
+    caixasVivas.push({ el: caixa, f: desenhar });
+    return caixa;
+  }
+
+
+  var POR_K = {}; PRODUTOS.forEach(function (p) { POR_K[p.k] = p; });
+
+  // ---------- remover produto: some na hora neste navegador e o robo para de acompanhar (via bot do Telegram) ----------
+  var removidos = ler("pn_removidos", {});
+  Object.keys(removidos).forEach(function (k) { if (!POR_K[k]) delete removidos[k]; });   // o robo ja tirou: limpa
+  guardar("pn_removidos", removidos);
+  var TODAS_OFERTAS = D.ofertas;
+  function aplicarRemovidos() {
+    PRODUTOS = D.produtos.filter(function (p) { return !removidos[p.k]; });
+    D.ofertas = TODAS_OFERTAS.filter(function (o) { return !removidos[o.produto]; });
+  }
+  aplicarRemovidos();
+  function linkBot(acao, ks) { return D.bot ? "https://t.me/" + D.bot + "?start=" + acao + "_" + ks.join("_") : ""; }
+  function botaoRemover(p, mini) {
+    var b = h("button", { class: "btn" + (mini ? " mini sel-mini rm-mini" : " remover"), type: "button",
+      title: "Tirar do painel e parar de acompanhar", "aria-label": "Remover " + p.titulo, texto: mini ? "✕" : "Remover" });
+    var armado = null;
+    b.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!armado) {               // primeiro clique so arma: evita remover sem querer
+        b.textContent = mini ? "?" : "Confirmar remoção";
+        b.classList.add("armado");
+        armado = setTimeout(function () { armado = null; b.textContent = mini ? "✕" : "Remover"; b.classList.remove("armado"); }, 4000);
+        return;
+      }
+      clearTimeout(armado);
+      removidos[p.k] = Date.now(); guardar("pn_removidos", removidos);
+      var i = selecao.indexOf(p.k); if (i >= 0) { selecao.splice(i, 1); guardar("pn_selecao", selecao); atualizarBarraSel(); }
+      var url = linkBot("rm", [p.k]);
+      if (url) window.open(url, "_blank", "noopener");
+      aplicarRemovidos();
+      if (location.hash === "#p-" + p.k) location.hash = "#produtos"; else rota();
+    });
+    return b;
+  }
+  function avisoRemovidos() {
+    var ks = Object.keys(removidos);
+    if (!ks.length) return null;
+    var url = linkBot("rm", ks.slice(0, 8));
+    return h("p", { class: "meta aviso-rm" }, [
+      ks.length + " produto(s) escondido(s) neste navegador, esperando o robô confirmar. ",
+      D.bot ? "Não clicou em Iniciar no Telegram? " : "",
+      url ? h("a", { href: url, target: "_blank", rel: "noopener", texto: "Mandar de novo" }) : null,
+      url ? " · " : "",
+      h("a", { href: "#", texto: "Desfazer", onclick: function (e) {
+        e.preventDefault();
+        var volta = linkBot("volta", ks.slice(0, 8));
+        removidos = {}; guardar("pn_removidos", removidos); aplicarRemovidos(); rota();
+        if (volta) window.open(volta, "_blank", "noopener");
+      } })]);
+  }
+  var OFERTA_DO_PRODUTO = {};
+  D.ofertas.forEach(function (o) { if (o.produto && o.situacao === "valendo") OFERTA_DO_PRODUTO[o.produto] = o; });
+  var tela = document.getElementById("tela");
+
+  // ---------- utilidades ----------
+  function guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function ler(k, padrao) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : padrao; } catch (e) { return padrao; } }
+  var feitas = ler("pn_feitas", {});
+  var estado = ler("pn_estado", { ofLoja: "todas", ofSit: "valendo", ofBusca: "", prBusca: "", prCat: "", prLoja: "", prOrdem: "queda", prMenor: false });
+  if (estado.tipo == null) estado.tipo = "";
+  function salvarEstado() { guardar("pn_estado", estado); }
+
+  function R(cent) { return "R$ " + (cent / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function quando(min, comHora) {
+    var d = new Date(min * 60000);
+    var o = { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" };
+    if (comHora) { o.hour = "2-digit"; o.minute = "2-digit"; }
+    return d.toLocaleString("pt-BR", o);
+  }
+  function semAcento(s) { return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+  function h(tag, attrs, filhos) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v == null || v === false) return;
+      if (k === "texto") e.textContent = v;
+      else if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? "" : v);
+    });
+    (filhos || []).forEach(function (f) { if (f != null) e.appendChild(typeof f === "string" ? document.createTextNode(f) : f); });
+    return e;
+  }
+  function foto(url, cls) {
+    var i = h("img", { class: cls || "foto", alt: "", loading: "lazy", referrerpolicy: "no-referrer" });
+    if (url) i.src = url;
+    return i;
+  }
+  function pctAbaixo(atual, ref) { return ref > 0 ? Math.round((ref - atual) / ref * 100) : 0; }
+  // Quanto o produto esta barato agora: o maior entre o desconto sobre o preco "de" da loja
+  // e a distancia do preco normal (mediana), esta so com 2 dias ou mais de historico.
+  function desconto(p) { return Math.max(p.de ? (p.de - p.atual) / p.de : 0, p.dias > 1 ? (p.mediana - p.atual) / p.mediana : 0); }
+
+  // ---------- texto do post (mesmo padrao do robo) ----------
+  function totalParcelado(p) {
+    var m = /(\d{1,2})x de R\$ ([\d.]+,\d{2})/.exec(p || "");
+    return m ? parseInt(m[1], 10) * Math.round(parseFloat(m[2].replace(/\./g, "").replace(",", ".")) * 100) : 0;
+  }
+  function aVista(preco, p) { var t = totalParcelado(p); return t > 0 && t > preco * 1.01; }
+  function textoDoProduto(p) {
+    var v = aVista(p.atual, p.parcelas) ? " à vista" : "";
+    var L = ["🔥 *[" + p.categoria + "] " + p.titulo + "* via " + (LOJAS[p.loja] || p.loja) + " 🇧🇷"];
+    if (p.de > p.atual) L.push("De ~" + R(p.de) + "~ por *" + R(p.atual) + "*" + v + " (" + pctAbaixo(p.atual, p.de) + "% off)");
+    else L.push("Por *" + R(p.atual) + "*" + v);
+    if (p.parcelas) L.push((v ? "💳 Ou em até " : "💳 Em até ") + p.parcelas);
+    if (p.vendedor) L.push("📦 Vendido por " + p.vendedor + (p.selo === "oficial" ? " (loja oficial)" : ""));
+    if (p.importado) L.push("✈️ Produto importado, com envio internacional");
+    L.push("", "👉 " + (p.link_curto || p.url), "", "📢 Entre no grupo de promoções do Project N:\n" + D.link_grupo);
+    return L.join("\n");
+  }
+  function botaoCopiar(fonte, rotulo) {
+    var obter = typeof fonte === "function" ? fonte : function () { return fonte; };
+    var area = h("textarea", { class: "copia", readonly: true, "aria-label": "Texto do post" });
+    area.value = obter(); area.hidden = true;
+    var b = h("button", { class: "btn forte", type: "button", texto: rotulo || "Copiar texto" });
+    b.addEventListener("click", function () {
+      var texto = obter(); area.value = texto;
+      function ok() { b.textContent = "Copiado"; setTimeout(function () { b.textContent = rotulo || "Copiar texto"; }, 1500); }
+      function manual() { area.hidden = false; area.focus(); area.select(); b.textContent = "Selecionado: Ctrl+C"; }
+      try { navigator.clipboard.writeText(texto).then(ok, manual); } catch (e) { manual(); }
+    });
+    return [b, area];
+  }
+
+  // ---------- graficos ----------
+  function serie(p, ateAgora) {
+    var pts = p.pontos.map(function (x) { return [x[0], x[1]]; });
+    if (ateAgora && pts.length && p.visto > pts[pts.length - 1][0]) pts.push([p.visto, pts[pts.length - 1][1]]);
+    return pts;
+  }
+  function caminhoDegraus(pts, X, Y) {
+    var d = "";
+    pts.forEach(function (q, i) {
+      if (i === 0) d += "M" + X(q[0]).toFixed(1) + " " + Y(q[1]).toFixed(1);
+      else d += "H" + X(q[0]).toFixed(1) + "V" + Y(q[1]).toFixed(1);
+    });
+    return d;
+  }
+  var NS = "http://www.w3.org/2000/svg";
+  function s(tag, attrs) { var e = document.createElementNS(NS, tag); Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); }); return e; }
+
+  function sparkline(p) {
+    var W = 120, H = 34, pts = serie(p, true);
+    var svg = s("svg", { class: "spark", viewBox: "0 0 " + W + " " + H, "aria-hidden": "true" });
+    if (!pts.length) return svg;
+    var t0 = pts[0][0], t1 = pts[pts.length - 1][0], lo = p.menor, hi = p.maior;
+    var X = function (t) { return t1 > t0 ? 2 + (t - t0) / (t1 - t0) * (W - 4) : W / 2; };
+    var Y = function (v) { return hi > lo ? 4 + (hi - v) / (hi - lo) * (H - 8) : H / 2; };
+    if (pts.length === 1) {          // um registro so: linha reta de ponta a ponta
+      pts = [[t0, pts[0][1]], [t0 + 1, pts[0][1]]];
+      X = function (t) { return t === t0 ? 2 : W - 2; };
+    }
+    svg.appendChild(s("path", { d: caminhoDegraus(pts, X, Y), fill: "none", stroke: "var(--muted)", "stroke-width": "1.5", "stroke-linejoin": "round" }));
+    var ult = pts[pts.length - 1];
+    svg.appendChild(s("circle", { cx: X(ult[0]), cy: Y(ult[1]), r: "2.6", fill: p.atual <= p.menor && p.dias > 1 ? "var(--accent)" : "var(--ink)" }));
+    return svg;
+  }
+
+  function graficoGrande(p) {
+    var W = Math.max(300, Math.min(1000, tela.clientWidth - 34)), H = W < 500 ? 200 : 240, E = 64, Dm = 14, T = 18, B = 26;
+    var pts = serie(p, true);
+    var svg = s("svg", { class: "grafico", viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Histórico de preço: menor " + R(p.menor) + ", maior " + R(p.maior) + ", atual " + R(p.atual) });
+    var t0 = pts[0][0], t1 = Math.max(pts[pts.length - 1][0], t0 + 60);
+    var faixa = Math.max(p.maior - p.menor, p.maior * 0.04);
+    var lo = Math.max(0, p.menor - faixa * 0.15), hi = p.maior + faixa * 0.15;
+    var X = function (t) { return E + (t - t0) / (t1 - t0) * (W - E - Dm); };
+    var Y = function (v) { return T + (hi - v) / (hi - lo) * (H - T - B); };
+    [lo + (hi - lo) * 0.1, (lo + hi) / 2, hi - (hi - lo) * 0.1].forEach(function (v) {
+      svg.appendChild(s("line", { x1: E, x2: W - Dm, y1: Y(v), y2: Y(v), stroke: "var(--line)", "stroke-width": "1" }));
+      var t = s("text", { x: E - 8, y: Y(v) + 4, "text-anchor": "end" }); t.textContent = R(Math.round(v)).replace(",00", ""); svg.appendChild(t);
+    });
+    if (pts.length === 1) pts = [pts[0], [t1, pts[0][1]]];
+    var linha = caminhoDegraus(pts, X, Y);
+    svg.appendChild(s("path", { d: linha + "V" + Y(lo) + "H" + X(pts[0][0]) + "Z", fill: "var(--accent-soft)", opacity: "0.8" }));
+    var med = Y(p.mediana);
+    svg.appendChild(s("line", { x1: E, x2: W - Dm, y1: med, y2: med, stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": "1" }));
+    var tm = s("text", { x: W - Dm, y: med - 5, "text-anchor": "end" }); tm.textContent = "mediana " + R(p.mediana); svg.appendChild(tm);
+    svg.appendChild(s("path", { d: linha, fill: "none", stroke: "var(--accent)", "stroke-width": "2.2", "stroke-linejoin": "round" }));
+    var ult = pts[pts.length - 1];
+    svg.appendChild(s("circle", { cx: X(ult[0]), cy: Y(ult[1]), r: "4.5", fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": "2" }));
+    [[t0, "start"], [t1, "end"]].forEach(function (par) {
+      var t = s("text", { x: X(par[0]), y: H - 6, "text-anchor": par[1] }); t.textContent = quando(par[0], t1 - t0 < 2 * 1440); svg.appendChild(t);
+    });
+    return svg;
+  }
+
+  // ---------- telas ----------
+  function navAtual(qual) {
+    ["ofertas", "novidades", "produtos", "cupons"].forEach(function (n) {
+      if (!document.getElementById("nav-" + n)) return;
+      var a = document.getElementById("nav-" + n);
+      if (n === qual) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    });
+  }
+  function chips(opcoes, valor, aoEscolher) {
+    return h("div", { class: "chips", role: "group" }, opcoes.map(function (o) {
+      return h("button", { class: "chip", type: "button", "aria-pressed": String(o[0] === valor), onclick: function () { aoEscolher(o[0]); } },
+        [o[1], o[2] != null ? h("span", { texto: " " + o[2] }) : null]);
+    }));
+  }
+  function chaveOferta(o) { return o.loja + "|" + o.id + "|" + o.detectada_em; }
+
+  function telaOfertas() {
+    navAtual("ofertas");
+    var cont = { valendo: 0, encerradas: 0, postadas: 0 }, porLoja = {};
+    D.ofertas.forEach(function (o) {
+      if (feitas[chaveOferta(o)]) cont.postadas++;
+      else if (o.situacao === "valendo") cont.valendo++;
+      else cont.encerradas++;
+      porLoja[o.loja] = (porLoja[o.loja] || 0) + 1;
+    });
+    var busca = h("input", { class: "busca", type: "search", id: "busca-ofertas", placeholder: "Buscar oferta", value: estado.ofBusca, "aria-label": "Buscar oferta" });
+    var lista = h("ul", { class: "grade" });
+    var vazio = h("p", { class: "vazio", hidden: true });
+    function desenhar() {
+      lista.textContent = "";
+      var q = semAcento(estado.ofBusca), n = 0;
+      D.ofertas.forEach(function (o) {
+        var feita = !!feitas[chaveOferta(o)];
+        var grupo = feita ? "postadas" : o.situacao === "valendo" ? "valendo" : "encerradas";
+        if (grupo !== estado.ofSit) return;
+        if (estado.ofLoja !== "todas" && o.loja !== estado.ofLoja) return;
+        if (estado.tipo && tipoDe(POR_K[o.produto]) !== estado.tipo) return;
+        if (estado.importado && !o.importado) return;
+        if (q && semAcento(o.titulo + " " + o.categoria).indexOf(q) < 0) return;
+        n++;
+        lista.appendChild(cartaoOferta(o, feita));
+      });
+      vazio.hidden = n > 0;
+      vazio.textContent = estado.ofSit === "valendo" ? "Nenhuma oferta valendo com esses filtros." :
+        estado.ofSit === "postadas" ? "Nada marcado como postado neste navegador." : "Nenhuma oferta encerrada.";
+    }
+    busca.addEventListener("input", function () { estado.ofBusca = busca.value; salvarEstado(); desenhar(); });
+    var lojas = [["todas", "Todas as lojas"]].concat(Object.keys(porLoja).map(function (l) { return [l, LOJAS[l] || l, porLoja[l]]; }));
+    tela.textContent = "";
+    tela.appendChild(h("div", { class: "barra" }, [
+      chips([["valendo", "Valendo", cont.valendo], ["encerradas", "Encerradas", cont.encerradas], ["postadas", "Postadas", cont.postadas]],
+        estado.ofSit, function (v) { estado.ofSit = v; salvarEstado(); telaOfertas(); }),
+      busca
+    ]));
+    if (lojas.length > 2) tela.appendChild(h("div", { class: "barra" }, [chips(lojas, estado.ofLoja, function (v) { estado.ofLoja = v; salvarEstado(); telaOfertas(); })]));
+    tela.appendChild(lista); tela.appendChild(vazio);
+    var tiposOf = {}, impOf = 0;
+    D.ofertas.forEach(function (o) {
+      var feita = !!feitas[chaveOferta(o)];
+      var grupo = feita ? "postadas" : o.situacao === "valendo" ? "valendo" : "encerradas";
+      if (grupo !== estado.ofSit || (estado.ofLoja !== "todas" && o.loja !== estado.ofLoja)) return;
+      if (o.importado) impOf++;
+      if (estado.importado && !o.importado) return;
+      var t = tipoDe(POR_K[o.produto]); tiposOf[t] = (tiposOf[t] || 0) + 1;
+    });
+    if (!impOf) estado.importado = false;
+    comLateral(menuTipos(tiposOf, telaOfertas, impOf));
+    desenhar();
+  }
+
+  function cartaoOferta(o, feita) {
+    var p = POR_K[o.produto];
+    var preco = Math.round(o.preco * 100), ref = Math.round(o.referencia * 100);
+    var sit = feita ? h("span", { class: "pill postada", texto: "Postada" }) :
+      o.situacao === "valendo" ? h("span", { class: "pill valendo", texto: "Valendo" }) :
+      o.situacao === "subiu" ? h("span", { class: "pill subiu", texto: "Subiu para " + R(Math.round(o.preco_atual * 100)) }) :
+      h("span", { class: "pill sumiu", texto: "Sumiu da busca" });
+    var menor = p && p.dias > 1 && preco <= p.menor ? h("span", { class: "pill menor", texto: "Menor preço em " + p.dias + " dias" }) : null;
+    var escolhidos = [];
+    var copiar = botaoCopiar(function () { return textoComCupons(o.texto, preco, escolhidos); });
+    var marcar = h("button", { class: "btn", type: "button", texto: feita ? "Desfazer" : "Já postei", onclick: function () {
+      if (feitas[chaveOferta(o)]) delete feitas[chaveOferta(o)]; else feitas[chaveOferta(o)] = Date.now();
+      guardar("pn_feitas", feitas); telaOfertas();
+    } });
+    return h("li", { class: "oferta" + (o.situacao !== "valendo" || feita ? " apagada" : "") }, [
+      foto(o.imagem),
+      h("div", null, [
+        h("div", { class: "cat" }, [o.categoria + " · " + (LOJAS[o.loja] || o.loja), sit, menor,
+          o.importado ? PILL_IMPORTADO() : null,
+          o.tem_link_afiliado ? null : h("span", { class: "pill semlink", texto: "Sem link de afiliado" })]),
+        h("h2", { class: "titulo", texto: o.titulo }),
+        h("div", { class: "preco" }, [h("strong", { texto: R(preco) }),
+          ref > preco ? h("s", { texto: R(ref) }) : null,
+          o.desconto_pct ? h("span", { class: "desc", texto: "-" + Math.round(o.desconto_pct) + "%" }) : null,
+          o.a_vista ? h("span", { class: "meta", texto: "à vista" }) : null]),
+        h("div", { class: "meta", texto: [o.parcelas ? "💳 " + o.parcelas : "", o.linha_validade, o.sinais.map(function (x) { return x.texto; }).join("; ")].filter(Boolean).join(" · ") }),
+        h("div", { class: "acoes" }, [copiar[0],
+          h("button", { class: "btn", type: "button", texto: "Gerar arte", onclick: function () { abrirArte(o.titulo, o.imagem, nomeDoArquivo(o.titulo)); } }),
+          marcar,
+          p ? botaoSelecionar(p.k) : null,
+          p ? h("a", { class: "btn", href: "#p-" + p.k, texto: "Histórico" }) : null,
+          p ? botaoRemover(p) : null,
+          o.url_afiliado || o.url ? h("a", { class: "btn", href: o.url_afiliado || o.url, target: "_blank", rel: "noopener", texto: "Abrir na loja" }) : null]),
+        caixaCupons(o.loja, preco, escolhidos, o.url_afiliado || o.url),
+        copiar[1]
+      ])
+    ]);
+  }
+
+  // ---------- menu lateral por tipo de produto ----------
+  var ORDEM_TIPOS = ["Jogos", "Consoles", "Controles", "Acessórios", "amiibo", "LEGO", "Funko", "Pelúcias", "Action figures",
+    "Cartas Pokémon", "Livros e mangás", "Outros"];
+  function tipoDe(p) { return (p && p.tipo) || "Outros"; }
+  var PILL_IMPORTADO = function () { return h("span", { class: "pill importado", title: "Envio internacional", texto: "✈️ Importado" }); };
+  function menuTipos(contagem, aoMudar, nImportados) {
+    var total = Object.keys(contagem).reduce(function (s, k) { return s + contagem[k]; }, 0);
+    if (estado.tipo && !contagem[estado.tipo]) estado.tipo = "";
+    var itens = [["", "Todos", total]].concat(ORDEM_TIPOS.filter(function (t) { return contagem[t]; }).map(function (t) { return [t, t, contagem[t]]; }));
+    return h("aside", { class: "lateral", "aria-label": "Tipo de produto" }, [
+      h("h3", { texto: "Tipo de produto" }),
+      h("ul", null, itens.map(function (x) {
+        return h("li", null, [h("button", { type: "button", class: "lat-item" + (estado.tipo === x[0] ? " ativo" : ""),
+          "aria-pressed": String(estado.tipo === x[0]), onclick: function () { estado.tipo = x[0]; salvarEstado(); aoMudar(); } },
+          [h("span", { texto: x[1] }), h("span", { class: "lat-n", texto: String(x[2]) })])]);
+      })),
+      nImportados ? h("h3", { texto: "Envio" }) : null,
+      nImportados ? h("ul", null, [h("li", null, [h("button", { type: "button", class: "lat-item" + (estado.importado ? " ativo" : ""),
+        "aria-pressed": String(!!estado.importado), onclick: function () { estado.importado = !estado.importado; salvarEstado(); aoMudar(); } },
+        [h("span", { texto: "✈️ Só importados" }), h("span", { class: "lat-n", texto: String(nImportados) })])])]) : null]);
+  }
+  function comLateral(aside) {
+    var c = h("div", { class: "conteudo" });
+    while (tela.firstChild) c.appendChild(tela.firstChild);
+    tela.appendChild(h("div", { class: "com-lateral" }, [aside, c]));
+  }
+
+  var LIMITE_PASSO = 60;
+  function telaProdutos() {
+    navAtual("produtos");
+    var cats = {}, lojas = {};
+    PRODUTOS.forEach(function (p) { cats[p.categoria] = (cats[p.categoria] || 0) + 1; lojas[p.loja] = (lojas[p.loja] || 0) + 1; });
+    var limite = LIMITE_PASSO;
+    var busca = h("input", { class: "busca", type: "search", id: "busca-produtos", placeholder: "Buscar produto (ex.: zelda, amiibo, pro controller)", value: estado.prBusca, "aria-label": "Buscar produto" });
+    function opc(id, rotulo, mapa, valor, nomes) {
+      var sel = h("select", { id: id, "aria-label": rotulo });
+      sel.appendChild(h("option", { value: "", texto: rotulo }));
+      Object.keys(mapa).sort().forEach(function (k) { sel.appendChild(h("option", { value: k, texto: (nomes ? nomes[k] || k : k) + " (" + mapa[k] + ")" })); });
+      sel.value = valor;
+      return sel;
+    }
+    var selCat = opc("filtro-categoria", "Todas as categorias", cats, estado.prCat);
+    var selLoja = opc("filtro-loja", "Todas as lojas", lojas, estado.prLoja, LOJAS);
+    var selOrdem = h("select", { id: "ordem", "aria-label": "Ordenar" }, [
+      ["promo", "Promoção primeiro, por preço"], ["queda", "Maior desconto"], ["menor", "Menor preço"], ["maior", "Maior preço"], ["nome", "Nome"], ["recentes", "Vistos por último"]
+    ].map(function (o) { return h("option", { value: o[0], texto: o[1] }); }));
+    selOrdem.value = estado.prOrdem;
+    var caixaMenor = h("input", { type: "checkbox", id: "so-menor" }); caixaMenor.checked = estado.prMenor;
+    var contagem = h("p", { class: "contagem" });
+    var lista = h("ul", { class: "lista" });
+    var mais = h("div", { class: "mais" });
+    function filtrados() {
+      var q = semAcento(estado.prBusca).split(/\s+/).filter(Boolean);
+      var r = PRODUTOS.filter(function (p) {
+        if (estado.prCat && p.categoria !== estado.prCat) return false;
+        if (estado.prLoja && p.loja !== estado.prLoja) return false;
+        if (estado.tipo && tipoDe(p) !== estado.tipo) return false;
+        if (estado.importado && !p.importado) return false;
+        if (estado.prMenor && !(p.dias > 1 && p.atual <= p.menor)) return false;
+        var t = semAcento(p.titulo + " " + p.categoria);
+        return q.every(function (w) { return t.indexOf(w) >= 0; });
+      });
+      var f = {
+        promo: function (a, b) { return !!OFERTA_DO_PRODUTO[b.k] - !!OFERTA_DO_PRODUTO[a.k] || a.atual - b.atual; },
+        queda: function (a, b) { return desconto(b) - desconto(a) || a.atual - b.atual; },
+        menor: function (a, b) { return a.atual - b.atual; }, maior: function (a, b) { return b.atual - a.atual; },
+        nome: function (a, b) { return a.titulo.localeCompare(b.titulo, "pt-BR"); },
+        recentes: function (a, b) { return b.visto - a.visto; }
+      }[estado.prOrdem] || function () { return 0; };
+      return r.sort(function (a, b) { return (b.ativo - a.ativo) || f(a, b); });
+    }
+    function desenhar() {
+      var r = filtrados();
+      contagem.textContent = r.length + " de " + PRODUTOS.length + " produtos";
+      lista.textContent = ""; mais.textContent = "";
+      r.slice(0, limite).forEach(function (p) { lista.appendChild(linhaProduto(p)); });
+      lista.hidden = !r.length;
+      if (!r.length) contagem.textContent = "Nenhum produto com esses filtros.";
+      if (r.length > limite) mais.appendChild(h("button", { class: "btn", type: "button", texto: "Mostrar mais " + Math.min(LIMITE_PASSO, r.length - limite),
+        onclick: function () { limite += LIMITE_PASSO; desenhar(); } }));
+    }
+    function mudou() {
+      estado.prBusca = busca.value; estado.prCat = selCat.value; estado.prLoja = selLoja.value;
+      estado.prOrdem = selOrdem.value; estado.prMenor = caixaMenor.checked; salvarEstado();
+      limite = LIMITE_PASSO; desenhar();
+    }
+    busca.addEventListener("input", mudou);
+    [selCat, selLoja, selOrdem, caixaMenor].forEach(function (e) { e.addEventListener("change", mudou); });
+    tela.textContent = "";
+    tela.appendChild(h("div", { class: "barra" }, [busca, selCat, Object.keys(lojas).length > 1 ? selLoja : null, selOrdem,
+      h("label", { class: "marcar", for: "so-menor" }, [caixaMenor, "No menor preço já visto"])]));
+    var avRm = avisoRemovidos(); if (avRm) tela.appendChild(avRm);
+    tela.appendChild(contagem); tela.appendChild(lista); tela.appendChild(mais);
+    var tiposPr = {}, impPr = 0;
+    PRODUTOS.forEach(function (p) {
+      if (p.importado) impPr++;
+      if (estado.importado && !p.importado) return;
+      var t = tipoDe(p); tiposPr[t] = (tiposPr[t] || 0) + 1;
+    });
+    if (!impPr) estado.importado = false;
+    comLateral(menuTipos(tiposPr, function () { if (estado.tipo) { estado.prOrdem = "promo"; salvarEstado(); } telaProdutos(); }, impPr));
+    desenhar();
+  }
+
+  function variacao(p) {
+    if (p.dias < 2) return p.de ? h("span", { class: "var baixo", texto: "-" + pctAbaixo(p.atual, p.de) + "% sobre o 'de'" })
+      : h("span", { class: "var neutro", texto: "histórico começando" });
+    if (p.atual <= p.menor) return h("span", { class: "var baixo", texto: "menor preço em " + p.dias + " dias" });
+    var d = pctAbaixo(p.atual, p.mediana);
+    if (d > 0) return h("span", { class: "var baixo", texto: d + "% abaixo do normal" });
+    if (d < 0) return h("span", { class: "var alto", texto: Math.abs(d) + "% acima do normal" });
+    return h("span", { class: "var neutro", texto: "no preço normal" });
+  }
+
+  function linhaProduto(p) {
+    return h("li", { class: "selecionavel" }, [botaoSelecionar(p.k, true), botaoRemover(p, true), h("a", { class: "linha", href: "#p-" + p.k, style: p.ativo ? null : "opacity:.55" }, [
+      foto(p.imagem),
+      h("div", { style: "min-width:0" }, [h("div", { class: "nome", texto: p.titulo }),
+        h("div", { class: "meta" }, [p.categoria + " · " + (LOJAS[p.loja] || p.loja) + (p.ativo ? "" : " · fora da busca desde " + quando(p.visto)) + " ",
+          p.prevenda ? h("span", { class: "pill subiu", texto: "Pré-venda" }) : null, " ",
+          p.novo ? h("span", { class: "pill valendo", texto: "Novo no radar" }) : null, " ",
+          OFERTA_DO_PRODUTO[p.k] ? h("span", { class: "pill desc-pill", texto: "Em promoção" }) : null, " ",
+          p.importado ? PILL_IMPORTADO() : null])]),
+      sparkline(p),
+      h("div", { class: "valor" }, [h("strong", { texto: R(p.atual) }), variacao(p)])
+    ])]);
+  }
+
+  function telaCupons() {
+    navAtual("cupons");
+    tela.textContent = "";
+    if (!CUPONS.length) {
+      tela.appendChild(h("p", { class: "vazio", texto: "Nenhum cupom válido no momento. Os cupons chegam dos grupos e canais do Telegram configurados em regras.json (cupons_telegram)." }));
+      return;
+    }
+    tela.appendChild(h("p", { class: "contagem", texto: CUPONS.length + " cupom(ns) postado(s) nas últimas horas. Confira sempre as regras na loja antes de postar." }));
+    var ordem = ["amazon", "mercadolivre", "shopee"], grupos = {};
+    CUPONS.forEach(function (c) { (grupos[c.loja] = grupos[c.loja] || []).push(c); });
+    Object.keys(grupos).sort(function (a, b) {
+      var ia = ordem.indexOf(a), ib = ordem.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    }).forEach(function (loja) {
+      var ofertasDaLoja = D.ofertas.filter(function (o) { return o.loja === loja && o.situacao === "valendo"; }).length;
+      tela.appendChild(h("section", { class: "secao-loja loja-" + (loja || "outra") }, [
+        h("h2", { class: "secao-titulo" }, [LOJAS_CUPOM[loja] || loja, h("span", { texto: grupos[loja].length + (grupos[loja].length === 1 ? " cupom" : " cupons") +
+          (ofertasDaLoja ? " · " + ofertasDaLoja + " ofertas valendo nessa loja" : "") })]),
+        h("ul", { class: "grade cupons-grade" }, grupos[loja].slice().sort(function (a, b) {
+          var pa = { ok: 0, "": 1, nao: 2 }[resultado(a)], pb = { ok: 0, "": 1, nao: 2 }[resultado(b)];
+          return pa - pb || !!b.confirmado_em - !!a.confirmado_em;
+        }).map(function (c) {
+          var copiar = h("button", { class: "btn forte", type: "button", texto: "Copiar código" });
+          copiar.addEventListener("click", function () {
+            try { navigator.clipboard.writeText(c.codigo).then(function () { copiar.textContent = "Copiado"; setTimeout(function () { copiar.textContent = "Copiar código"; }, 1500); }); } catch (e) {}
+          });
+          var regras = regrasDoCupom(c), r = resultado(c);
+          return h("li", { class: "cupom-card" + (r === "nao" ? " apagada" : "") }, [
+            h("div", { class: "codigo", texto: c.codigo }),
+            r ? h("span", { class: "pill " + (r === "ok" ? "valendo" : "sumiu"), texto: r === "ok" ? "Funcionou" : "Não funcionou" }) : null,
+            seloOficial(c),
+            h("div", { class: "cupom-regras" }, regras.length ? regras.map(function (r) { return h("span", { class: "chip-regra", texto: r }); })
+              : [h("span", { class: "meta", texto: "Regra não identificada: veja a mensagem" })]),
+            h("div", { class: "meta", texto: "Visto " + quando(Math.floor(new Date(c.visto_em).getTime() / 60000), true) + (c.origem ? " · " + c.origem : "") }),
+            textoOficial(c),
+            h("div", { class: "acoes" }, [copiar].concat(botoesTeste(c, telaCupons))),
+            h("details", { class: "cp-msg" }, [h("summary", { texto: "Mensagem original" }), h("p", { texto: c.texto })])
+          ]);
+        }))
+      ]));
+    });
+  }
+
+  function telaNovidades() {
+    navAtual("novidades");
+    var lista = PRODUTOS.filter(function (p) { return p.novo || p.prevenda; })
+      .sort(function (a, b) { return (b.ativo - a.ativo) || (!!b.prevenda - !!a.prevenda) || (b.desde - a.desde); });
+    tela.textContent = "";
+    tela.appendChild(h("p", { class: "contagem", texto: lista.length
+      ? lista.length + " produto(s): pré-vendas e o que apareceu nas lojas nos últimos 7 dias."
+      : "" }));
+    if (!lista.length) {
+      tela.appendChild(h("p", { class: "vazio", texto: "Nenhuma novidade ainda. Aqui aparecem pré-vendas e produtos que surgiram nas lojas nos últimos 7 dias (o que já existia quando o robô começou a coletar não conta)." }));
+      return;
+    }
+    var ul = h("ul", { class: "lista" });
+    lista.forEach(function (p) { ul.appendChild(linhaProduto(p)); });
+    tela.appendChild(ul);
+  }
+
+  function telaProduto(k) {
+    var p = POR_K[k];
+    navAtual("");
+    tela.textContent = "";
+    if (!p) { tela.appendChild(h("p", { class: "vazio", texto: "Produto não encontrado. Ele pode ter saído do acompanhamento." })); return; }
+    var oferta = OFERTA_DO_PRODUTO[p.k];
+    var escolhidosP = [];
+    var copiar = botaoCopiar(function () { return textoComCupons(oferta ? oferta.texto : textoDoProduto(p), p.atual, escolhidosP); },
+      oferta ? "Copiar texto da oferta" : "Copiar texto do post");
+    var dias = Math.max(1, Math.round((p.visto - p.desde) / 1440));
+    tela.appendChild(h("a", { class: "voltar", href: "#" + (rotaAnterior || "produtos"), texto: "← Voltar" }));
+    tela.appendChild(h("div", { class: "ficha" }, [
+      foto(p.imagem),
+      h("div", { style: "min-width:0" }, [
+        h("div", { class: "cat" }, [p.categoria + " · " + (LOJAS[p.loja] || p.loja) + (p.vendedor ? " · vendido por " + p.vendedor : ""),
+          oferta ? h("span", { class: "pill valendo", texto: "Em oferta" }) : null,
+          p.importado ? PILL_IMPORTADO() : null,
+          p.ativo ? null : h("span", { class: "pill sumiu", texto: "Fora da busca desde " + quando(p.visto) })]),
+        h("h1", { texto: p.titulo }),
+        h("div", { class: "preco" }, [h("strong", { texto: R(p.atual) }), p.de ? h("s", { texto: R(p.de) }) : null,
+          p.de ? h("span", { class: "desc", texto: "-" + pctAbaixo(p.atual, p.de) + "%" }) : null,
+          p.dias > 1 || !p.de ? variacao(p) : null]),
+        p.parcelas ? h("div", { class: "meta", texto: "💳 " + (aVista(p.atual, p.parcelas) ? "à vista no Pix, ou em até " : "em até ") + p.parcelas }) : null,
+        h("div", { class: "acoes" }, [copiar[0],
+          h("button", { class: "btn", type: "button", texto: "Gerar arte", onclick: function () { abrirArte(p.titulo, p.imagem, nomeDoArquivo(p.titulo)); } }),
+          botaoSelecionar(p.k),
+          p.url ? h("a", { class: "btn", href: p.url, target: "_blank", rel: "noopener", texto: "Abrir na loja" }) : null,
+          botaoRemover(p)]),
+        caixaCupons(p.loja, p.atual, escolhidosP, p.url),
+        copiar[1]
+      ])
+    ]));
+    tela.appendChild(h("dl", { class: "numeros" }, [
+      ["Agora", R(p.atual), "visto " + quando(p.visto, true)],
+      ["Menor", R(p.menor), pctAbaixo(p.menor, p.atual) ? pctAbaixo(p.menor, p.atual) * -1 + "% vs agora" : "é o preço atual"],
+      ["Normal (mediana)", R(p.mediana), "dos menores preços diários"],
+      ["Maior", R(p.maior), p.registros + " registros"]
+    ].map(function (c) { return h("div", null, [h("dt", { texto: c[0] }), h("dd", null, [c[1], h("small", { texto: c[2] })])]); })));
+    var caixa = h("section", { class: "caixa" }, [h("h3", { texto: "Histórico de preço" }), graficoGrande(p),
+      h("p", { class: "nota", texto: "Acompanhado desde " + quando(p.desde) + " (" + dias + (dias === 1 ? " dia" : " dias") + "). " +
+        (p.dias < 7 ? "O histórico ainda é curto: a comparação com o preço normal fica confiável a partir de 7 dias de coleta." :
+          "Linha tracejada: preço normal, a mediana dos menores preços de cada dia.") })]);
+    tela.appendChild(caixa);
+    var mudancas = p.pontos.slice().reverse().slice(0, 20);
+    var tabela = h("table", null, [h("thead", null, [h("tr", null, [h("th", { texto: "Desde" }), h("th", { class: "n", texto: "Preço" }), h("th", { class: "n", texto: "Variação" })])]),
+      h("tbody", null, mudancas.map(function (x, i) {
+        var ant = mudancas[i + 1], dv = ant ? Math.round((x[1] - ant[1]) / ant[1] * 100) : null;
+        return h("tr", null, [h("td", { texto: quando(x[0], true) }), h("td", { class: "n", texto: R(x[1]) }),
+          h("td", { class: "n", texto: dv == null ? "início" : (dv > 0 ? "+" : "") + dv + "%" })]);
+      }))]);
+    tela.appendChild(h("section", { class: "caixa" }, [h("h3", { texto: "Mudanças de preço" }), h("div", { style: "overflow-x:auto" }, [tabela])]));
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- gerador de arte (moldura PROMO 1080x1080) ----------
+  // Camadas: promo_base.png (moldura com miolo branco) -> foto do produto -> promo_topo.png
+  // (faixa PROMO, selo e listras, com o miolo transparente). A foto cabe na area AREA e pode
+  // ser ampliada e arrastada. Fotos de loja que nao liberam uso em canvas "travam" o download;
+  // nesse caso a pessoa troca a foto (arquivo ou Ctrl+V).
+  var ARTE = { tam: 1080, area: { x: 60, y: 300, w: 960, h: 730 } };
+  var molduras = null;
+  function carregarImg(src, anonimo) {
+    return new Promise(function (ok, erro) {
+      var i = new Image();
+      if (anonimo) i.crossOrigin = "anonymous";
+      i.onload = function () { ok(i); }; i.onerror = function () { erro(new Error("falhou")); };
+      i.src = src;
+    });
+  }
+  function fotoGrande(url) {
+    // Amazon: tira o sufixo de miniatura (._AC_UL320_) e pega a foto original
+    return (url || "").replace(/\._[A-Z0-9_,]+_(\.(?:jpg|jpeg|png|webp))$/i, "$1");
+  }
+  function abrirArte(titulo, urlFoto, nomeArquivo) {
+    var dlg = document.getElementById("dlg-arte");
+    if (dlg) dlg.remove();
+    var tela = h("canvas", { class: "arte-tela", width: ARTE.tam, height: ARTE.tam, "aria-label": "Prévia da arte" });
+    var ctx = tela.getContext("2d");
+    var zoom = h("input", { type: "range", id: "arte-zoom", min: "40", max: "250", value: "100" });
+    var arquivo = h("input", { type: "file", id: "arte-arquivo", accept: "image/*", hidden: true });
+    var aviso = h("div", { class: "arte-aviso", hidden: true });
+    var btnCopiar = h("button", { class: "btn forte", type: "button", texto: "Copiar imagem" });
+    var btnBaixar = h("button", { class: "btn", type: "button", texto: "Baixar JPG" });
+    var estadoArte = { foto: null, livre: true, dx: 0, dy: 0, z: 1 };
+
+    function desenhar() {
+      ctx.clearRect(0, 0, ARTE.tam, ARTE.tam);
+      if (molduras) ctx.drawImage(molduras.base, 0, 0, ARTE.tam, ARTE.tam);
+      else { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, ARTE.tam, ARTE.tam); }
+      var f = estadoArte.foto;
+      if (f) {
+        var a = ARTE.area, esc = Math.min(a.w / f.naturalWidth, a.h / f.naturalHeight) * estadoArte.z;
+        var w = f.naturalWidth * esc, hh = f.naturalHeight * esc;
+        ctx.drawImage(f, a.x + (a.w - w) / 2 + estadoArte.dx, a.y + (a.h - hh) / 2 + estadoArte.dy, w, hh);
+      }
+      if (molduras) ctx.drawImage(molduras.topo, 0, 0, ARTE.tam, ARTE.tam);
+    }
+    function avisar(txt, ok) { aviso.hidden = !txt; aviso.textContent = txt || ""; aviso.className = ok ? "arte-ok" : "arte-aviso"; }
+    function liberar(livre) {
+      estadoArte.livre = livre;
+      btnCopiar.disabled = btnBaixar.disabled = !livre;
+      if (!livre) avisar("A loja não liberou esta foto para gerar o arquivo. Use \"Trocar foto\": escolha um arquivo, ou copie uma imagem (botão direito → Copiar imagem) e cole aqui com Ctrl+V.");
+    }
+    function usarFoto(img, livre) {
+      estadoArte.foto = img; estadoArte.dx = estadoArte.dy = 0; estadoArte.z = 1; zoom.value = "100";
+      liberar(livre); if (livre) avisar(""); desenhar();
+    }
+    function carregarDaLoja(url) {
+      if (!url) { avisar("Este produto não tem foto. Use \"Trocar foto\"."); return; }
+      var grande = fotoGrande(url);
+      carregarImg(grande, true).catch(function () { return grande !== url ? carregarImg(url, true) : Promise.reject(); })
+        .then(function (img) { usarFoto(img, true); })
+        .catch(function () { return carregarImg(grande, false).then(function (img) { usarFoto(img, false); }); })
+        .catch(function () { avisar("Não foi possível abrir a foto da loja. Use \"Trocar foto\"."); });
+    }
+    function deArquivo(blob) {
+      if (!blob || !/^image\//.test(blob.type)) return;
+      var u = URL.createObjectURL(blob);
+      carregarImg(u, false).then(function (img) { usarFoto(img, true); avisar("Foto trocada.", true); });
+    }
+    function gerarBlob(tipo, q) { return new Promise(function (ok, erro) { try { tela.toBlob(function (b) { b ? ok(b) : erro(); }, tipo, q); } catch (e) { erro(e); } }); }
+
+    zoom.addEventListener("input", function () { estadoArte.z = zoom.value / 100; desenhar(); });
+    arquivo.addEventListener("change", function () { deArquivo(arquivo.files[0]); arquivo.value = ""; });
+    var arrasto = null;
+    tela.addEventListener("pointerdown", function (e) { tela.setPointerCapture(e.pointerId); arrasto = { x: e.clientX, y: e.clientY, dx: estadoArte.dx, dy: estadoArte.dy }; });
+    tela.addEventListener("pointermove", function (e) {
+      if (!arrasto) return;
+      var k = ARTE.tam / tela.getBoundingClientRect().width;
+      estadoArte.dx = arrasto.dx + (e.clientX - arrasto.x) * k; estadoArte.dy = arrasto.dy + (e.clientY - arrasto.y) * k; desenhar();
+    });
+    tela.addEventListener("pointerup", function () { arrasto = null; });
+    tela.addEventListener("wheel", function (e) {
+      e.preventDefault(); zoom.value = Math.max(40, Math.min(250, +zoom.value - Math.sign(e.deltaY) * 6)); estadoArte.z = zoom.value / 100; desenhar();
+    }, { passive: false });
+    btnBaixar.addEventListener("click", function () {
+      gerarBlob("image/jpeg", 0.92).then(function (b) {
+        var a = h("a", { href: URL.createObjectURL(b), download: (nomeArquivo || "promo") + ".jpg" });
+        document.body.appendChild(a); a.click(); a.remove(); avisar("Arte baixada.", true);
+      }).catch(function () { liberar(false); });
+    });
+    btnCopiar.addEventListener("click", function () {
+      if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) { avisar("Este navegador não copia imagens. Use \"Baixar JPG\"."); return; }
+      navigator.clipboard.write([new ClipboardItem({ "image/png": gerarBlob("image/png") })])
+        .then(function () { avisar("Imagem copiada. No WhatsApp Web, cole com Ctrl+V.", true); })
+        .catch(function () { avisar("Não foi possível copiar. Use \"Baixar JPG\"."); });
+    });
+
+    dlg = h("dialog", { class: "arte", id: "dlg-arte", "aria-label": "Gerar arte" }, [
+      h("div", { class: "arte-topo" }, [h("h2", { texto: "Gerar arte" }),
+        h("button", { class: "fechar", type: "button", "aria-label": "Fechar", texto: "×", onclick: function () { dlg.close(); } })]),
+      h("div", { class: "arte-corpo" }, [
+        h("div", null, [tela, h("p", { class: "arte-dica", texto: "Arraste a foto para posicionar. A roda do mouse aumenta ou diminui." })]),
+        h("div", { class: "arte-lado" }, [
+          h("div", { class: "meta", texto: titulo }),
+          h("label", { for: "arte-zoom" }, ["Zoom da foto", zoom]),
+          h("div", { class: "acoes" }, [
+            h("button", { class: "btn", type: "button", texto: "Centralizar", onclick: function () { estadoArte.dx = estadoArte.dy = 0; estadoArte.z = 1; zoom.value = "100"; desenhar(); } }),
+            h("button", { class: "btn", type: "button", texto: "Trocar foto", onclick: function () { arquivo.click(); } }), arquivo]),
+          aviso,
+          h("div", { class: "acoes" }, [btnCopiar, btnBaixar]),
+          h("p", { class: "arte-dica", texto: "Sai em 1080×1080, no modelo PROMO do Project N. Também dá para colar uma foto aqui com Ctrl+V." })
+        ])
+      ])
+    ]);
+    dlg.addEventListener("close", function () { document.removeEventListener("paste", colar); dlg.remove(); });
+    function colar(e) {
+      var itens = (e.clipboardData && e.clipboardData.items) || [];
+      for (var i = 0; i < itens.length; i++) if (itens[i].type.indexOf("image/") === 0) { e.preventDefault(); deArquivo(itens[i].getAsFile()); return; }
+    }
+    document.addEventListener("paste", colar);
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    desenhar();
+    var prontas = molduras ? Promise.resolve() : Promise.all([carregarImg("arte/promo_base.png", true), carregarImg("arte/promo_topo.png", true)])
+      .then(function (m) { molduras = { base: m[0], topo: m[1] }; })
+      .catch(function () { avisar("Não encontrei a moldura (pasta arte/ do painel). Rode rodar.bat painel para publicá-la."); });
+    prontas.then(function () { desenhar(); carregarDaLoja(urlFoto); });
+  }
+  function nomeDoArquivo(t) { return "promo-" + semAcento(t).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50); }
+
+  // ---------- selecao de varios produtos -> post combinado (texto + arte em grade) ----------
+  var selecao = ler("pn_selecao", []).filter(function (k) { return POR_K[k]; });
+  var barraSel = h("div", { class: "barra-selecao", id: "barra-selecao", hidden: true });
+  document.body.appendChild(barraSel);
+  function selecionado(k) { return selecao.indexOf(k) >= 0; }
+  function lojaDaSelecao() { return selecao.length ? POR_K[selecao[0]].loja : ""; }
+  function alternarSelecao(k) {
+    var i = selecao.indexOf(k);
+    if (i < 0 && lojaDaSelecao() && POR_K[k].loja !== lojaDaSelecao()) {      // um post combinado e de uma loja so
+      atualizarBarraSel("A seleção é só de " + (LOJAS[lojaDaSelecao()] || lojaDaSelecao()) + ". Limpe a seleção para montar um post de outra loja.");
+      return false;
+    }
+    if (i >= 0) selecao.splice(i, 1); else selecao.push(k);
+    guardar("pn_selecao", selecao); atualizarBarraSel(); pintarBotoesSel();
+    return true;
+  }
+  function botaoSelecionar(k, mini) {
+    var b = h("button", { class: "btn" + (mini ? " mini sel-mini" : ""), type: "button" });
+    function pintar() {
+      var s = selecionado(k);
+      b.textContent = mini ? (s ? "✓" : "+") : (s ? "✓ Na seleção" : "+ Seleção");
+      b.classList.toggle("marcado-ok", s);
+      b.classList.toggle("outra-loja", !s && !!lojaDaSelecao() && POR_K[k].loja !== lojaDaSelecao());
+      b.setAttribute("aria-pressed", String(s));
+      b.title = s ? "Tirar da seleção do post combinado" : "Juntar a um post com vários produtos";
+    }
+    b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); alternarSelecao(k); });
+    botoesSel.push({ b: b, k: k, pintar: pintar });
+    pintar();
+    return b;
+  }
+  var botoesSel = [];
+  function pintarBotoesSel() {      // apaga os botoes de produtos de outra loja enquanto ha selecao
+    botoesSel = botoesSel.filter(function (x) { return x.b.isConnected; });
+    botoesSel.forEach(function (x) { x.pintar(); });
+  }
+  var avisoSelTimer = null;
+  function atualizarBarraSel(aviso) {
+    barraSel.textContent = "";
+    barraSel.hidden = !selecao.length;
+    if (!selecao.length) return;
+    clearTimeout(avisoSelTimer);
+    if (aviso) {
+      barraSel.appendChild(h("span", { class: "sel-aviso", role: "status", texto: aviso }));
+      avisoSelTimer = setTimeout(function () { atualizarBarraSel(); }, 4000);
+    } else {
+      barraSel.appendChild(h("span", { texto: selecao.length + (selecao.length === 1 ? " produto selecionado" : " produtos selecionados") +
+        " · " + (LOJAS[lojaDaSelecao()] || lojaDaSelecao()) }));
+    }
+    barraSel.appendChild(h("button", { class: "btn forte", type: "button", texto: "Montar post", onclick: abrirCombo }));
+    barraSel.appendChild(h("button", { class: "btn", type: "button", texto: "Limpar", onclick: function () {
+      selecao = []; guardar("pn_selecao", selecao); atualizarBarraSel(); rota();
+    } }));
+  }
+  var AVISO_PAGAMENTO = "⚠️ O preço final aparece na etapa de pagamento";
+  var AVISO_IMPORTADO = "✈️ Envio internacional. Taxas inclusas.";
+  function vezes(p) { var m = /(\d+)\s*x/i.exec(p.parcelas || ""); return m ? " em até " + m[1] + "x" : ""; }
+  function textoCombo(itens, titulo, obs, extras) {
+    var lojas = {}; itens.forEach(function (p) { lojas[p.loja] = 1; });
+    var umaLoja = Object.keys(lojas).length === 1 ? Object.keys(lojas)[0] : "";
+    var L = ["🔥 *" + (umaLoja ? "[" + (LOJAS[umaLoja] || umaLoja) + "] " : "") + titulo.trim() + "*"];
+    var imp = itens.filter(function (p) { return p.importado; }).length, todosImp = imp === itens.length;
+    var avisos = (extras || []).concat(obs.trim() ? [obs.trim()] : []);
+    if (avisos.length) L.push("", avisos.join("\n"));
+    itens.forEach(function (p) {
+      L.push("", "*" + p.titulo + "*" + (umaLoja ? "" : " (" + (LOJAS[p.loja] || p.loja) + ")") + (p.importado && !todosImp ? " ✈️ importado" : ""),
+        "👉 " + (p.link_curto || p.url));
+      L.push((p.de > p.atual ? "De ~" + R(p.de) + "~ por *" + R(p.atual) + "*" : "💰 *" + R(p.atual) + "*") + vezes(p));
+    });
+    L.push("", "📢 Entre no grupo de promoções do Project N:\n" + D.link_grupo);
+    return L.join("\n");
+  }
+  // Grade: escolhe o numero de colunas que deixa cada capa (em pe) maior dentro da area da moldura
+  function gradeCombo(n, a, reserva) {
+    var melhor = null, alt = a.h - reserva;
+    for (var cols = 1; cols <= n; cols++) {
+      var rows = Math.ceil(n / cols), cw = a.w / cols, ch = alt / rows;
+      var lado = Math.min(cw * 0.9 * 1.5, ch * 0.9);      // altura da capa (proporcao 2:3)
+      if (!melhor || lado > melhor.lado) melhor = { cols: cols, rows: rows, cw: cw, ch: ch, lado: lado };
+    }
+    return melhor;
+  }
+  function abrirCombo() {
+    var itens = selecao.map(function (k) { return POR_K[k]; }).filter(Boolean);
+    if (!itens.length) return;
+    var dlg = document.getElementById("dlg-combo");
+    if (dlg) dlg.remove();
+    var lojas = {}; itens.forEach(function (p) { lojas[p.loja] = 1; });
+    var uma = Object.keys(lojas).length === 1 ? (LOJAS[Object.keys(lojas)[0]] || "") : "";
+    var titulo = h("input", { type: "text", id: "combo-titulo", value: uma ? "Jogos em promoção na " + uma : "Seleção de ofertas" });
+    var obs = h("textarea", { id: "combo-obs", rows: "3", placeholder: "Ex.: ⚠️ O preço final aparece na etapa de pagamento" });
+    var aPartir = h("input", { type: "checkbox", id: "combo-apartir" }); aPartir.checked = true;
+    var avPag = h("input", { type: "checkbox", id: "combo-av-pag" });
+    var avImp = h("input", { type: "checkbox", id: "combo-av-imp" });
+    avImp.checked = itens.every(function (p) { return p.importado; });
+    function extras() { return (avPag.checked ? [AVISO_PAGAMENTO] : []).concat(avImp.checked ? [AVISO_IMPORTADO] : []); }
+    var lista = h("ol", { class: "combo-lista" });
+    var tela = h("canvas", { class: "arte-tela", width: ARTE.tam, height: ARTE.tam, "aria-label": "Prévia da arte" });
+    var ctx = tela.getContext("2d");
+    var aviso = h("div", { class: "arte-aviso", hidden: true });
+    var fotos = {}, travadas = {};
+    var area = h("textarea", { class: "copia", readonly: true, "aria-label": "Texto do post" }); area.hidden = true;
+    function avisar(txt, ok) { aviso.hidden = !txt; aviso.textContent = txt || ""; aviso.className = ok ? "arte-ok" : "arte-aviso"; }
+    function cor(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#d0021b"; }
+    function desenhar() {
+      ctx.clearRect(0, 0, ARTE.tam, ARTE.tam);
+      if (molduras) ctx.drawImage(molduras.base, 0, 0, ARTE.tam, ARTE.tam);
+      else { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, ARTE.tam, ARTE.tam); }
+      var a = ARTE.area, reserva = aPartir.checked ? 120 : 0, g = gradeCombo(itens.length, a, reserva);
+      itens.forEach(function (p, i) {
+        var c = i % g.cols, r = Math.floor(i / g.cols);
+        var naLinha = Math.min(g.cols, itens.length - r * g.cols), sobra = (g.cols - naLinha) * g.cw / 2;   // centraliza a ultima linha
+        var x = a.x + sobra + c * g.cw, y = a.y + r * g.ch, bw = g.cw * 0.9, bh = g.ch * 0.9;
+        var f = fotos[p.k];
+        if (f) {
+          var esc = Math.min(bw / f.naturalWidth, bh / f.naturalHeight), w = f.naturalWidth * esc, hh = f.naturalHeight * esc;
+          ctx.drawImage(f, x + (g.cw - w) / 2, y + (g.ch - hh) / 2, w, hh);
+        } else {
+          ctx.fillStyle = "#f1f1f1"; ctx.fillRect(x + g.cw * 0.05, y + g.ch * 0.05, bw, bh);
+          ctx.fillStyle = "#666"; ctx.font = "600 20px system-ui, sans-serif"; ctx.textAlign = "center";
+          ctx.fillText(p.titulo.slice(0, 18), x + g.cw / 2, y + g.ch / 2); ctx.textAlign = "left";
+        }
+      });
+      if (aPartir.checked) {
+        var menor = Math.min.apply(null, itens.map(function (p) { return p.atual; }));
+        var bw2 = 340, bh2 = 104, bx = a.x + a.w - bw2, by = a.y + a.h - bh2;
+        ctx.fillStyle = cor("--accent");
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, bw2, bh2, 18); else ctx.rect(bx, by, bw2, bh2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.textAlign = "right";
+        ctx.font = "600 26px system-ui, sans-serif"; ctx.fillText(itens.length > 1 ? "a partir de" : "por", bx + bw2 - 22, by + 36);
+        ctx.font = "800 52px system-ui, sans-serif"; ctx.fillText(R(menor), bx + bw2 - 22, by + 88);
+        ctx.textAlign = "left";
+      }
+      if (molduras) ctx.drawImage(molduras.topo, 0, 0, ARTE.tam, ARTE.tam);
+    }
+    function redesenharLista() {
+      lista.textContent = "";
+      itens.forEach(function (p, i) {
+        function mover(d) { var j = i + d; if (j < 0 || j >= itens.length) return; itens.splice(j, 0, itens.splice(i, 1)[0]);
+          selecao = itens.map(function (x) { return x.k; }); guardar("pn_selecao", selecao); tudo(); }
+        lista.appendChild(h("li", null, [
+          h("span", { class: "combo-nome", texto: p.titulo }), h("strong", { texto: R(p.atual) }),
+          h("span", { class: "combo-bts" }, [
+            h("button", { class: "btn mini", type: "button", "aria-label": "Subir", texto: "↑", onclick: function () { mover(-1); } }),
+            h("button", { class: "btn mini", type: "button", "aria-label": "Descer", texto: "↓", onclick: function () { mover(1); } }),
+            h("button", { class: "btn mini", type: "button", "aria-label": "Tirar", texto: "✕", onclick: function () {
+              itens.splice(i, 1); selecao = itens.map(function (x) { return x.k; }); guardar("pn_selecao", selecao); atualizarBarraSel();
+              if (!itens.length) { dlg.close(); rota(); return; } tudo(); } })])]));
+      });
+    }
+    function tudo() {
+      redesenharLista(); desenhar(); area.value = textoCombo(itens, titulo.value, obs.value, extras());
+      var faltam = itens.filter(function (p) { return travadas[p.k]; });
+      if (faltam.length) avisar("A loja não liberou a foto de: " + faltam.map(function (p) { return p.titulo.slice(0, 40); }).join("; ") + ". Ela aparece como um quadro cinza.");
+    }
+    [titulo, obs].forEach(function (e) { e.addEventListener("input", function () { tudo(); }); });
+    [avPag, avImp].forEach(function (e) { e.addEventListener("change", function () { tudo(); }); });
+    aPartir.addEventListener("change", desenhar);
+    function gerarBlob(tipo, q) { return new Promise(function (ok, erro) { try { tela.toBlob(function (b) { b ? ok(b) : erro(); }, tipo, q); } catch (e) { erro(e); } }); }
+    var btnTexto = h("button", { class: "btn forte", type: "button", texto: "Copiar texto", onclick: function () {
+      area.value = textoCombo(itens, titulo.value, obs.value, extras());
+      copiarTexto(area.value).then(function () { avisar("Texto copiado.", true); }).catch(function () { area.hidden = false; area.select(); });
+    } });
+    var btnImg = h("button", { class: "btn", type: "button", texto: "Copiar imagem", onclick: function () {
+      if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) { avisar("Este navegador não copia imagens. Use \"Baixar JPG\"."); return; }
+      navigator.clipboard.write([new ClipboardItem({ "image/png": gerarBlob("image/png") })])
+        .then(function () { avisar("Imagem copiada. No WhatsApp Web, cole com Ctrl+V.", true); })
+        .catch(function () { avisar("Não foi possível copiar. Use \"Baixar JPG\"."); });
+    } });
+    var btnBaixar = h("button", { class: "btn", type: "button", texto: "Baixar JPG", onclick: function () {
+      gerarBlob("image/jpeg", 0.92).then(function (b) {
+        var l = h("a", { href: URL.createObjectURL(b), download: nomeDoArquivo(titulo.value) + ".jpg" });
+        document.body.appendChild(l); l.click(); l.remove(); avisar("Arte baixada.", true);
+      }).catch(function () { avisar("Não foi possível gerar o arquivo."); });
+    } });
+    dlg = h("dialog", { class: "arte", id: "dlg-combo", "aria-label": "Post com vários produtos" }, [
+      h("div", { class: "arte-topo" }, [h("h2", { texto: "Post com vários produtos" }),
+        h("button", { class: "fechar", type: "button", "aria-label": "Fechar", texto: "×", onclick: function () { dlg.close(); } })]),
+      h("div", { class: "arte-corpo" }, [
+        h("div", null, [tela]),
+        h("div", { class: "arte-lado" }, [
+          h("label", { for: "combo-titulo" }, ["Título do post", titulo]),
+          h("label", { class: "marcar", for: "combo-av-pag" }, [avPag, AVISO_PAGAMENTO]),
+          h("label", { class: "marcar", for: "combo-av-imp" }, [avImp, AVISO_IMPORTADO]),
+          h("label", { for: "combo-obs" }, ["Outros avisos (opcional)", obs]),
+          h("label", { class: "marcar", for: "combo-apartir" }, [aPartir, "Mostrar \"a partir de\" na arte"]),
+          lista, aviso,
+          h("div", { class: "acoes" }, [btnTexto, btnImg, btnBaixar]), area,
+          h("p", { class: "arte-dica", texto: "Use ↑ ↓ para mudar a ordem (vale para a arte e o texto). A arte sai em 1080×1080 no modelo PROMO." })
+        ])
+      ])
+    ]);
+    dlg.addEventListener("close", function () { dlg.remove(); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    tudo();
+    carregarMolduras().then(function () {
+      desenhar();
+      itens.forEach(function (p) {
+        if (!p.imagem) { travadas[p.k] = 1; return; }
+        var g = fotoGrande(p.imagem);
+        carregarImg(g, true).catch(function () { return g !== p.imagem ? carregarImg(p.imagem, true) : Promise.reject(); })
+          .then(function (img) { fotos[p.k] = img; desenhar(); })
+          .catch(function () { travadas[p.k] = 1; tudo(); });
+      });
+    });
+  }
+  function carregarMolduras() {
+    return molduras ? Promise.resolve() : Promise.all([carregarImg("arte/promo_base.png", true), carregarImg("arte/promo_topo.png", true)])
+      .then(function (m) { molduras = { base: m[0], topo: m[1] }; }).catch(function () {});
+  }
+  atualizarBarraSel();
+
+  // ---------- rotas ----------
+  document.getElementById("n-ofertas").textContent = D.ofertas.filter(function (o) { return o.situacao === "valendo" && !feitas[chaveOferta(o)]; }).length;
+  document.getElementById("n-produtos").textContent = PRODUTOS.length;
+  document.getElementById("n-cupons").textContent = CUPONS.length;
+  document.getElementById("n-novidades").textContent = PRODUTOS.filter(function (p) { return p.novo || p.prevenda; }).length;
+  document.getElementById("atualizado").textContent = "Atualizado em " + new Date(D.gerado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  var horas = (Date.now() - new Date(D.gerado_em).getTime()) / 3600000;
+  if (horas > 3) {
+    var at = document.getElementById("atualizado");
+    at.textContent += " · há " + Math.floor(horas) + " h: a coleta pode ter parado";
+    at.style.color = "var(--accent)"; at.style.fontWeight = "600";
+  }
+  var rotaAnterior = "";
+  function rota() {
+    var hs = location.hash.replace("#", "");
+    if (hs.indexOf("p-") !== 0) rotaAnterior = hs || "ofertas";
+    if (hs.indexOf("p-") === 0) telaProduto(parseInt(hs.slice(2), 10));
+    else if (hs === "produtos") telaProdutos();
+    else if (hs === "novidades") telaNovidades();
+    else if (hs === "cupons") telaCupons();
+    else telaOfertas();
+  }
+  window.addEventListener("hashchange", rota);
+  var sair = document.getElementById("sair");
+  if (JSON.parse(document.getElementById("dados").textContent).cifrado) {
+    sair.hidden = false;
+    sair.addEventListener("click", function () {
+      try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf("pn_chave_") === 0) localStorage.removeItem(k); }); } catch (x) {}
+      location.reload();
+    });
+  }
+  rota();
+}
+
+// ---------- entrada: dados abertos ou protegidos por senha ----------
+(function () {
+  "use strict";
+  var bruto = JSON.parse(document.getElementById("dados").textContent);
+  if (!bruto.cifrado) { iniciarPainel(bruto); return; }
+  var CHAVE_LOCAL = "pn_chave_" + bruto.sal;
+  function b64(t) { var s = atob(t), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  function emB64(buf) { var s = "", a = new Uint8Array(buf); for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+  function abrir(chave) {
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(bruto.iv) }, chave, b64(bruto.dados))
+      .then(function (claro) { return JSON.parse(new TextDecoder().decode(claro)); });
+  }
+  function chaveDaSenha(senha) {
+    return crypto.subtle.importKey("raw", new TextEncoder().encode(senha), "PBKDF2", false, ["deriveKey"]).then(function (base) {
+      return crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(bruto.sal), iterations: bruto.iteracoes, hash: "SHA-256" },
+        base, { name: "AES-GCM", length: 256 }, true, ["decrypt"]);
+    });
+  }
+  function chaveCrua(raw) { return crypto.subtle.importKey("raw", b64(raw), { name: "AES-GCM" }, true, ["decrypt"]); }
+  var tela = document.getElementById("tela");
+  document.querySelector("nav").hidden = true;
+  function pedirSenha(erro) {
+    tela.innerHTML = "";
+    var form = document.createElement("form");
+    form.className = "cofre";
+    form.innerHTML = '<h1>Painel restrito</h1><p class="meta">Digite a senha do painel de promoções do Project N.</p>' +
+      '<label for="senha-painel">Senha</label><input id="senha-painel" type="password" autocomplete="current-password" required>' +
+      '<label class="marcar" for="lembrar-painel"><input id="lembrar-painel" type="checkbox" checked> Lembrar neste navegador</label>' +
+      '<p class="erro" id="erro-senha" hidden></p><button class="btn forte" type="submit">Entrar</button>';
+    tela.appendChild(form);
+    var campo = form.querySelector("#senha-painel"), err = form.querySelector("#erro-senha");
+    if (erro) { err.textContent = erro; err.hidden = false; }
+    campo.focus();
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var botao = form.querySelector("button"); botao.disabled = true; botao.textContent = "Abrindo…";
+      chaveDaSenha(campo.value).then(function (chave) {
+        return abrir(chave).then(function (D) {
+          if (form.querySelector("#lembrar-painel").checked) {
+            crypto.subtle.exportKey("raw", chave).then(function (raw) { try { localStorage.setItem(CHAVE_LOCAL, emB64(raw)); } catch (x) {} });
+          }
+          document.querySelector("nav").hidden = false; iniciarPainel(D);
+        });
+      }).catch(function () { pedirSenha("Senha incorreta."); });
+    });
+  }
+  if (!window.crypto || !crypto.subtle) { tela.innerHTML = '<p class="vazio">Este navegador não consegue abrir o painel protegido. Use o Chrome, o Edge ou o Safari atualizados.</p>'; return; }
+  var guardada = null;
+  try { guardada = localStorage.getItem(CHAVE_LOCAL); } catch (x) {}
+  if (!guardada) { pedirSenha(); return; }
+  chaveCrua(guardada).then(abrir).then(function (D) { document.querySelector("nav").hidden = false; iniciarPainel(D); })
+    .catch(function () { try { localStorage.removeItem(CHAVE_LOCAL); } catch (x) {} pedirSenha(); });
+})();
+</script>
+</body>
+</html>

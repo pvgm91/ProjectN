@@ -26,8 +26,10 @@ class Item:
     vendas: int = 0
     comissao_pct: float = 0.0
     categoria: str = ""       # preenchida pela fonte quando ela ja sabe (ex.: eShop); senao vem do catalogo
+    prevenda: str = ""        # texto de pre-venda da loja (ex.: "Pré-venda: lançamento em 5 de dezembro"), se houver
     parcelas: str = ""        # ex.: '8x de R$ 55,04 sem juros', como a loja mostra
     validade: str = ""        # fim da promocao, em UTC (ISO), quando a loja informa
+    importado: str = ""       # "sim" quando a loja indica envio internacional / produto importado
 
 
 def para_centavos(valor):

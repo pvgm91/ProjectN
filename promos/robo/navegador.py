@@ -31,6 +31,7 @@ class Navegador:
                 break
             except Exception as e:          # canal nao instalado: tenta o proximo
                 erro = e
+                print(f"[navegador] nao abriu o {canal or 'navegador do Playwright'}: {str(e).splitlines()[0][:200]}")
         if not self.ctx:
             self.fechar()
             raise ErroDaFonte(f"nao foi possivel abrir o navegador: {str(erro)[:200]}")
@@ -44,8 +45,34 @@ class Navegador:
             raise ErroDaFonte(f"pagina nao carregou: {str(e)[:120]}")
         return self.pagina.url
 
+    def esperar(self, seletor, ms=8000):
+        """Espera o seletor aparecer. Devolve False se nao apareceu no tempo."""
+        try:
+            self.pagina.wait_for_selector(seletor, timeout=ms, state="attached")
+            return True
+        except Exception:
+            return False
+
+    def foto(self, caminho):
+        try:
+            self.pagina.screenshot(path=str(caminho), full_page=False)
+        except Exception:
+            pass
+
     def avaliar(self, js):
         return self.pagina.evaluate(js)
+
+    def avaliar_com(self, js, arg):
+        return self.pagina.evaluate(js, arg)
+
+    def rolar(self, vezes=3):
+        """Desce a pagina aos poucos para carregar fotos e cartoes que so aparecem com a rolagem."""
+        for _ in range(vezes):
+            try:
+                self.pagina.mouse.wheel(0, 2500)
+                self.pagina.wait_for_timeout(600)
+            except Exception:
+                return
 
     def fechar(self):
         for alvo, metodo in ((self.ctx, "close"), (self._pw, "stop")):

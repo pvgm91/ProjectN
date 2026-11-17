@@ -1,0 +1,214 @@
+# Jogos em midia fisica que o robo procura pelo nome, alem das buscas gerais.
+# Um jogo por linha, embaixo da plataforma. Linhas com # sao ignoradas. Pode editar a vontade.
+# O robo nao procura todos de uma vez: a cada hora ele pega alguns da fila (rodizio), para nao
+# chamar atencao das lojas. Quantos por hora: "jogos_por_ciclo" em config/regras.json.
+
+[Switch 2]
+Mario Kart World
+Donkey Kong Bananza
+Pokemon Legends Z-A
+Kirby Air Riders
+Hyrule Warriors Age of Imprisonment
+Metroid Prime 4 Beyond
+Super Mario Party Jamboree Jamboree TV
+Zelda Breath of the Wild Switch 2 Edition
+Zelda Tears of the Kingdom Switch 2 Edition
+Kirby and the Forgotten Land Star-Crossed World
+Super Mario Galaxy 1 + 2
+Super Mario Bros Wonder Switch 2 Edition
+Animal Crossing New Horizons Switch 2 Edition
+Mario Tennis Fever
+Yoshi and the Mysterious Book
+Pokemon Pokopia
+Fire Emblem Fortune's Weave
+Splatoon Raiders
+The Duskbloods
+Professor Layton and the New World of Steam
+Pokemon Champions
+Star Fox
+Drag x Drive
+Cyberpunk 2077 Ultimate Edition
+Street Fighter 6
+Hogwarts Legacy
+Elden Ring Tarnished Edition
+Final Fantasy VII Remake Intergrade
+Final Fantasy VII Rebirth
+Resident Evil Requiem
+Resident Evil Village
+Resident Evil 7
+Resident Evil 4
+Hades II
+Sonic Racing CrossWorlds
+Sonic X Shadow Generations
+EA Sports FC 26
+NBA 2K26
+Madden NFL 26
+Borderlands 4
+Star Wars Outlaws
+Assassin's Creed Shadows
+Split Fiction
+Hitman World of Assassination
+Bravely Default Flying Fairy HD Remaster
+Survival Kids
+Disney Epic Mickey Rebrushed
+Destroy All Humans 2 Reprobed
+Absolum
+Brigandine Abyss
+Trails Beyond the Horizon
+Harvest Moon Echoes of Teradea
+Ys X Proud Nordics
+Yakuza 0 Director's Cut
+Yakuza Kiwami
+Persona 3 Reload
+Dragon Quest I & II HD-2D Remake
+Octopath Traveler 0
+Daemon X Machina Titanic Scion
+Monster Hunter Stories 3
+Pragmata
+Final Fantasy Tactics The Ivalice Chronicles
+Rune Factory Guardians of Azuma
+Story of Seasons Grand Bazaar
+No Sleep for Kaname Date
+Hollow Knight Silksong
+Shadow Labyrinth
+Deltarune
+Fast Fusion
+Momotaro Dentetsu 2
+Pac-Man World 2 Re-Pac
+Raidou Remastered
+Indiana Jones and the Great Circle
+007 First Light
+Dragon Ball Sparking Zero
+Kunitsu-Gami Path of the Goddess
+LEGO Party
+LEGO Batman Legacy of the Dark Knight
+Fallout 4 Anniversary Edition
+Tony Hawk's Pro Skater 3 + 4
+Mina the Hollower
+Metal Gear Solid Master Collection
+Bomberman 2
+Puyo Puyo Tetris
+Super Bomberman R 2
+Mario Kart World Bundle
+Nintendo Switch 2 Welcome Tour
+Pokemon Legends Z-A Mega Dimension
+Donkey Kong Bananza DK Island
+Hades
+Prince of Persia The Lost Crown
+Just Dance 2026
+Rayman
+Marvel Cosmic Invasion
+Hyrule Warriors
+Kirby Air Riders
+WWE 2K26
+Lumines Arise
+Bravely Default
+Atelier Ryza Secret Trilogy
+
+[Switch]
+Let's Sing 2026
+Mario Kart 8 Deluxe
+Zelda Breath of the Wild
+Zelda Tears of the Kingdom
+Animal Crossing New Horizons
+Super Smash Bros Ultimate
+Super Mario Odyssey
+Pokemon Scarlet
+Pokemon Violet
+Pokemon Sword
+Pokemon Shield
+Pokemon Legends Arceus
+Pokemon Brilliant Diamond
+Pokemon Shining Pearl
+Pokemon Let's Go Pikachu
+Pokemon Let's Go Eevee
+Splatoon 3
+Splatoon 2
+Super Mario Party
+Mario Party Superstars
+Super Mario Party Jamboree
+New Super Mario Bros U Deluxe
+Luigi's Mansion 3
+Ring Fit Adventure
+Super Mario 3D World + Bowser's Fury
+Super Mario Maker 2
+Super Mario Bros Wonder
+Kirby and the Forgotten Land
+Kirby Star Allies
+Kirby Return to Dream Land Deluxe
+Pikmin 4
+Pikmin 3 Deluxe
+Xenoblade Chronicles 3
+Xenoblade Chronicles Definitive Edition
+Xenoblade Chronicles X Definitive Edition
+Xenoblade Chronicles 2
+Fire Emblem Three Houses
+Fire Emblem Engage
+Metroid Dread
+Metroid Prime Remastered
+Metroid Prime 4 Beyond
+Mario + Rabbids Kingdom Battle
+Mario + Rabbids Sparks of Hope
+Minecraft
+Hollow Knight
+Stardew Valley
+Overcooked 2
+Just Dance 2025
+Mario Tennis Aces
+Mario Golf Super Rush
+Mario Strikers Battle League
+Nintendo Switch Sports
+Clubhouse Games
+Donkey Kong Country Tropical Freeze
+Donkey Kong Country Returns HD
+Captain Toad Treasure Tracker
+Paper Mario The Origami King
+Paper Mario The Thousand-Year Door
+Mario & Luigi Brothership
+Super Mario RPG
+Princess Peach Showtime
+Mario vs Donkey Kong
+Zelda Link's Awakening
+Zelda Skyward Sword HD
+Zelda Echoes of Wisdom
+Hyrule Warriors Age of Calamity
+Bayonetta 3
+Astral Chain
+Octopath Traveler II
+Triangle Strategy
+Bravely Default II
+Dragon Quest XI S
+Monster Hunter Rise
+Monster Hunter Stories 2
+Sonic Frontiers
+Sonic Superstars
+Sonic Mania Plus
+Crash Bandicoot N Sane Trilogy
+Spyro Reignited Trilogy
+Mortal Kombat 1
+Persona 5 Royal
+Persona 4 Golden
+Dragon Ball Xenoverse 2
+Dragon Ball FighterZ
+Naruto Ultimate Ninja Storm 4
+Rayman Legends
+Cuphead
+Hades
+Disney Dreamlight Valley
+LEGO Star Wars The Skywalker Saga
+LEGO Marvel Super Heroes 2
+LEGO Harry Potter Collection
+The Witcher 3 Complete Edition
+Diablo III Eternal Collection
+Pokemon Mystery Dungeon Rescue Team DX
+Pokken Tournament DX
+New Pokemon Snap
+Detective Pikachu Returns
+Tomodachi Life Living the Dream
+Rhythm Heaven Groove
+Fantasy Life i
+Rune Factory 5
+WarioWare Move It
+Game Builder Garage
+Professor Layton and the Curious Village HD
+Pokemon Legends Z-A

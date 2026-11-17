@@ -17,6 +17,7 @@ Dê dois cliques ou rode no terminal, dentro da pasta `promos`:
 | `vigiar.bat` | Coleta sem parar (a cada 30 min); deixe a janela aberta |
 | `rodar.bat ofertas` | Mostra as ofertas novas com o texto pronto para colar no grupo |
 | `rodar.bat testar amazon` | Uma única chamada à loja, para conferir a chave (também `testar shopee`) |
+| `rodar.bat painel` | Refaz o painel com o que já está no banco, sem coletar, e publica |
 | `abrir_painel.bat` | Abre o painel de ofertas (`docs\index.html`), regerado a cada coleta |
 | `rodar.bat status` | Quantos produtos e preços já estão no banco |
 | `rodar.bat adicionar ...` | Cadastra uma oferta à mão (hoje, o caminho para o Mercado Livre) |
@@ -36,7 +37,7 @@ Copie `.env.example` para `.env` e preencha. O `.env` fica só no PC; o `.gitign
 | Nintendo eShop | Desligada (ligue em `lojas_ativas`, no `regras.json`). Funciona sem chave: lê a página pública de ofertas da loja (cerca de 100 destaques). Sem afiliado | — |
 | Shopee | Conector pronto, ainda não testado com chave real | affiliate.shopee.com.br, seção Open API |
 | Amazon | **Pelo site, sem API** (`amazon_pelo_site: true`): o robô abre a busca da amazon.com.br num navegador, acompanha os preços e, quando há sinal de oferta, confere preço e vendedor na página do produto. Só vira oferta o que é vendido pela Amazon. Se aparecer CAPTCHA, a coleta da Amazon para naquele ciclo. Precisa do `instalar.bat` uma vez. A Creators API fica pronta para quando a conta for elegível (`amazon_pelo_site: false`) | — |
-| Mercado Livre | **Pelo site, sem API** (`mercadolivre_pelo_site: true`): exige um login único no navegador do robô (`rodar.bat entrar mercadolivre`). Só entra anúncio de loja oficial. O link de afiliado continua saindo do portal | — |
+| Mercado Livre | **API oficial, pelo catálogo** (`MERCADOLIVRE_APP_ID` e `MERCADOLIVRE_SECRET` no `.env`, permissão *Publicação e sincronização* em leitura e `rodar.bat entrar mercadolivre` uma vez). Busca as palavras-chave no catálogo e lê o preço de quem está vendendo; só entra loja oficial. Produtos escolhidos a dedo vão em `config/lista_mercadolivre.txt` (links com `/p/MLB...`). O link do post ganha a sua identificação de afiliado (`mercadolivre_afiliado` no `regras.json`) | developers.mercadolivre.com.br/devcenter |
 
 ## Como uma oferta é detectada
 
@@ -80,7 +81,13 @@ Testes: `py -3 -m unittest discover -s tests -v`
 
 ## Painel
 
-Cada coleta regera `docs/index.html`, uma página única com as ofertas da fila, botão de copiar o texto e marcação "Já postei" (guardada só no navegador de quem marcou). Abra com `abrir_painel.bat`.
+Cada coleta regera `docs/index.html`, uma página única com três áreas:
+
+- **Ofertas**: as ofertas da fila, separadas em *Valendo*, *Encerradas* (o preço subiu ou o produto sumiu da busca) e *Postadas* (marcadas com "Já postei", guardado só no navegador de quem marcou). Botão de copiar o texto pronto.
+- **Produtos**: todos os produtos acompanhados, com busca, filtro por categoria, ordenação (maior desconto, menor preço, nome) e mini gráfico do preço.
+- **Ficha do produto**: preço atual, menor, normal (mediana dos menores preços de cada dia) e maior, gráfico do histórico, lista das mudanças de preço e botão para copiar o texto do post, mesmo fora de promoção.
+
+Nos primeiros dias o histórico é curto: a comparação com o preço normal fica confiável a partir de 7 dias de coleta.
 
 Para ter o painel online, o repositório `pvgm91/ProjectN` precisa ser público. O robô envia o painel para a pasta `docs` a cada coleta, usando o `GITHUB_TOKEN` do `.env`, e o GitHub Pages serve essa pasta em https://pvgm91.github.io/ProjectN/.
 
@@ -89,3 +96,9 @@ Primeira vez: `rodar.bat enviar-codigo` (manda o projeto) e depois `rodar.bat pu
 ## Rodar de hora em hora
 
 `agendar.bat` cria uma tarefa no Agendador do Windows que roda a coleta a cada hora, sem precisar de janela aberta. O resultado de cada rodada fica em `dados\log.txt`. `desagendar.bat` remove a tarefa.
+
+## Novidades, cupons e avisos
+
+- **Novidades** (aba do painel): pré-vendas da Amazon e produtos que apareceram nas lojas nos últimos 7 dias. O que já existia na primeira coleta de cada loja não conta como novidade.
+- **Cupons** (aba do painel): lidos dos grupos e canais do Telegram listados em `cupons_telegram` no `regras.json`, com a sua conta (`TELEGRAM_API_ID` e `TELEGRAM_API_HASH` no `.env`, de my.telegram.org, e `rodar.bat entrar telegram` uma vez). Só os códigos e as regras são guardados; links de terceiros nas mensagens não são usados. Quando um cupom da mesma loja se aplica a uma oferta, o painel mostra o preço com cupom.
+- **Avisos** pelo seu bot do Telegram (`TELEGRAM_BOT_TOKEN` no `.env`, criado com o @BotFather, e `rodar.bat entrar avisos` uma vez): CAPTCHA da Amazon, acesso do Mercado Livre expirado, loja que não trouxe produto nenhum, painel que não foi publicado. O mesmo aviso não se repete por 6 horas, e chega um "voltou ao normal" quando resolve. O painel também mostra em vermelho quando a última atualização tem mais de 3 horas.

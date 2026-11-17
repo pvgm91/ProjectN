@@ -4,14 +4,15 @@ import json
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from robo import catalogo as cat, config, db, detector, exportar, painel, reputacao  # noqa: E402
+from robo import avisos, catalogo as cat, config, cupons, db, detector, exportar, jogos, links, painel, remover, reputacao  # noqa: E402
 from robo.coletor import processar  # noqa: E402
-from robo.fontes import amazon, amazon_site, eshop, mercadolivre_site, shopee  # noqa: E402
+from robo.fontes import amazon, amazon_site, eshop, mercadolivre, mercadolivre_site, shopee  # noqa: E402
 from robo.navegador import Navegador  # noqa: E402
 
 try:
@@ -80,8 +81,12 @@ class Reputacao(unittest.TestCase):
         self.assertFalse(reputacao.aprovado(item(vendas=3), REGRAS)[0])
 
     def test_mercadolivre_exige_selo(self):
-        self.assertFalse(reputacao.aprovado(item(loja="mercadolivre", selo="", nota=0, vendas=0), REGRAS)[0])
-        self.assertTrue(reputacao.aprovado(item(loja="mercadolivre", selo="oficial", nota=0, vendas=0), REGRAS)[0])
+        so_oficial = json.loads(json.dumps(REGRAS))
+        so_oficial["reputacao"]["mercadolivre"]["exigir_selo"] = True
+        self.assertFalse(reputacao.aprovado(item(loja="mercadolivre", selo="", nota=0, vendas=0), so_oficial)[0])
+        self.assertTrue(reputacao.aprovado(item(loja="mercadolivre", selo="oficial", nota=0, vendas=0), so_oficial)[0])
+        # padrao: aceita o vencedor do catalogo, que o proprio Mercado Livre escolhe
+        self.assertTrue(reputacao.aprovado(item(loja="mercadolivre", selo="", nota=0, vendas=0), REGRAS)[0])
 
 
 class Detector(unittest.TestCase):
@@ -109,7 +114,7 @@ class Detector(unittest.TestCase):
         s = detector.detectar(15000, 0, 0, [], [20000] * 7, REGRAS)
         self.assertEqual(s[0]["tipo"], "historico")
         self.assertEqual(s[0]["pct"], 25.0)
-        self.assertIn("menor preco em 7 dias", s[0]["texto"])
+        self.assertIn("menor preço em 7 dias", s[0]["texto"])
 
     def test_historico_desmascara_desconto_inflado(self):
         # loja diz "de 300 por 200", mas o produto sempre custou 200
@@ -390,7 +395,295 @@ class GitHub(unittest.TestCase):
         self.assertFalse(any(".env" in c[1] for c in chamadas))
 
 
+class PainelComSenha(unittest.TestCase):
+    def test_dados_cifrados_e_abriveis_com_a_senha(self):
+        import base64
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        sal = b"0123456789abcdef"
+        html = painel.montar({"gerado_em": "x", "ofertas": [{"titulo": "Segredo Zelda"}]}, "minha senha", sal)
+        self.assertNotIn("Segredo Zelda", html)
+        bloco = json.loads(html.split('id="dados">')[1].split("</script>")[0])
+        self.assertEqual((bloco["cifrado"], bloco["iteracoes"]), (1, painel.ITERACOES))
+        chave = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=base64.b64decode(bloco["sal"]),
+                           iterations=bloco["iteracoes"]).derive(b"minha senha")
+        claro = AESGCM(chave).decrypt(base64.b64decode(bloco["iv"]), base64.b64decode(bloco["dados"]), None)
+        self.assertEqual(json.loads(claro)["ofertas"][0]["titulo"], "Segredo Zelda")
+        self.assertIn("Segredo Zelda", painel.montar({"gerado_em": "x", "ofertas": [{"titulo": "Segredo Zelda"}]}))
+        with self.assertRaises(painel.ErroCifra):
+            painel.montar({"gerado_em": "x", "ofertas": []}, "senha", b"curto")
+
+
+class Cupons(unittest.TestCase):
+    QUANDO = datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+
+    def test_extrair_varios_formatos(self):
+        msg = ("🔥 CUPOM AMAZON\n10% OFF em games acima de R$ 150 (limitado a R$ 60 de desconto)\n"
+               "Use o cupom: GAMES10\nVálido até 20/11\n👉 https://amzn.to/xyz")
+        c = cupons.extrair(msg, self.QUANDO)
+        self.assertEqual(len(c), 1)
+        c = c[0]
+        self.assertEqual((c["codigo"], c["loja"], c["desconto_pct"], c["minimo_cent"], c["teto_cent"], c["validade"]),
+                         ("GAMES10", "amazon", 10.0, 15000, 6000, "2026-11-20"))
+        self.assertNotIn("amzn.to", c["texto"])                                  # sem link de terceiros
+        ml = cupons.extrair("Mercado Livre: R$ 30 OFF com o código `NINTENDO30` em compras acima de R$ 200", self.QUANDO)[0]
+        self.assertEqual((ml["codigo"], ml["loja"], ml["desconto_cent"], ml["desconto_pct"], ml["minimo_cent"]),
+                         ("NINTENDO30", "mercadolivre", 3000, 0.0, 20000))
+        self.assertEqual(cupons.extrair("Promoção de hoje na Amazon, frete grátis! Link aqui", self.QUANDO), [])
+        self.assertEqual(cupons.extrair("cupom: AMAZON frete GRATIS", self.QUANDO), [])          # palavras comuns nao sao codigo
+        virada = cupons.extrair("Shopee cupom SHOPEE5 válido até 05/01", datetime(2026, 12, 20, tzinfo=timezone.utc))[0]
+        self.assertEqual(virada["validade"], "2027-01-05")
+
+    def test_varios_cupons_na_mesma_mensagem(self):
+        msg = ("🚨 CUPONS DE HOJE\n\n"
+               "Mercado Livre\n🎟️ TODOSITE1311 - R$ 20 OFF acima de R$ 99\n🎟️ SITETODO1311 - 10% OFF (máx. R$ 50 de desconto)\n\n"
+               "Shopee\n🎟️ cupom NASHOPEE120AF: R$ 120 OFF em compras acima de R$ 899\n\nAmazon: use LEGO15 para 15% OFF em LEGO")
+        c = {x["codigo"]: x for x in cupons.extrair(msg, self.QUANDO)}
+        self.assertEqual(sorted(c), ["LEGO15", "NASHOPEE120AF", "SITETODO1311", "TODOSITE1311"])
+        self.assertEqual((c["TODOSITE1311"]["loja"], c["TODOSITE1311"]["desconto_cent"], c["TODOSITE1311"]["minimo_cent"]),
+                         ("mercadolivre", 2000, 9900))
+        self.assertEqual((c["SITETODO1311"]["loja"], c["SITETODO1311"]["desconto_pct"], c["SITETODO1311"]["teto_cent"]),
+                         ("mercadolivre", 10.0, 5000))
+        self.assertEqual((c["NASHOPEE120AF"]["loja"], c["NASHOPEE120AF"]["desconto_cent"], c["NASHOPEE120AF"]["minimo_cent"]),
+                         ("shopee", 12000, 89900))
+        self.assertEqual((c["LEGO15"]["loja"], c["LEGO15"]["desconto_pct"]), ("amazon", 15.0))
+        secoes = cupons.extrair("Cupons do dia\n\nShopee\n🎟️ AAAA11 - R$ 10 OFF\n🎟️ BBBB22 - R$ 15 OFF\n\nMercado Livre\n🎟️ CCCC33 - 5% OFF", self.QUANDO)
+        self.assertEqual([(x["codigo"], x["loja"]) for x in secoes], [("AAAA11", "shopee"), ("BBBB22", "shopee"), ("CCCC33", "mercadolivre")])
+
+    def test_mesmo_codigo_com_e_sem_loja(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            base = {"desconto_pct": 0, "desconto_cent": 0, "minimo_cent": 0, "teto_cent": 0, "validade": "", "texto": "t"}
+            db.salvar_cupom(con, dict(base, codigo="T41RN0V11", loja="", minimo_cent=20000), "G", self.QUANDO)
+            db.salvar_cupom(con, dict(base, codigo="T41RN0V11", loja="shopee", desconto_cent=5000), "G", self.QUANDO)
+            db.salvar_cupom(con, dict(base, codigo="T41RN0V11", loja=""), "G", self.QUANDO + timedelta(hours=1))
+            linhas = [dict(l) for l in con.execute("SELECT codigo, loja, desconto_cent, minimo_cent FROM cupons")]
+            con.close()
+        self.assertEqual(linhas, [{"codigo": "T41RN0V11", "loja": "shopee", "desconto_cent": 5000, "minimo_cent": 20000}])
+
+    def test_preco_com_cupom(self):
+        c = {"desconto_pct": 10, "minimo_cent": 15000, "teto_cent": 6000}
+        self.assertEqual(cupons.preco_com_cupom(20000, c), 18000)
+        self.assertEqual(cupons.preco_com_cupom(90000, c), 84000)             # teto
+        self.assertIsNone(cupons.preco_com_cupom(10000, c))                    # abaixo do minimo
+        self.assertEqual(cupons.preco_com_cupom(5000, {"desconto_cent": 3000}), 2000)
+        self.assertIsNone(cupons.preco_com_cupom(5000, {}))
+
+    def test_banco_de_cupons(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            for dias, cod, val in [(1, "VELHO", ""), (0, "NOVO", "2026-11-30"), (0, "VENCIDO", "2026-11-10")]:
+                db.salvar_cupom(con, {"codigo": cod, "loja": "amazon", "desconto_pct": 5, "desconto_cent": 0, "minimo_cent": 0,
+                                      "teto_cent": 0, "validade": val, "texto": "t"}, "Canal", self.QUANDO - timedelta(days=dias * 5))
+            db.salvar_cupom(con, {"codigo": "NOVO", "loja": "amazon", "desconto_pct": 5, "desconto_cent": 0, "minimo_cent": 0,
+                                  "teto_cent": 0, "validade": "", "texto": "t2"}, "Canal", self.QUANDO - timedelta(days=1))
+            db.salvar_cupom(con, {"codigo": "KABUM10", "loja": "kabum", "desconto_pct": 10, "desconto_cent": 0, "minimo_cent": 0,
+                                  "teto_cent": 0, "validade": "", "texto": "t"}, "Canal", self.QUANDO)
+            self.assertIn("KABUM10", [c["codigo"] for c in db.listar_cupons(con, self.QUANDO, horas=3)])
+            lista = db.listar_cupons(con, self.QUANDO, horas=3, lojas=["amazon", "mercadolivre", "shopee"])
+            self.assertEqual([(c["codigo"], c["validade"]) for c in lista], [("NOVO", "2026-11-30")])   # validade antiga mantida
+            con.close()
+
+    def test_cupom_so_das_ultimas_3_horas(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            for horas, cod in [(2, "RECENTE"), (4, "DE4H"), (48, "DE2DIAS")]:
+                db.salvar_cupom(con, {"codigo": cod, "loja": "amazon", "desconto_pct": 5, "desconto_cent": 0, "minimo_cent": 0,
+                                      "teto_cent": 0, "validade": "", "texto": "t"}, "Canal", self.QUANDO - timedelta(hours=horas))
+            self.assertEqual([c["codigo"] for c in db.listar_cupons(con, self.QUANDO)], ["RECENTE"])
+            con.close()
+
+
+class AvisosTelegram(unittest.TestCase):
+    def test_sem_configuracao_nao_manda(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = avisos.Avisos({}, d, enviar=lambda m, p: self.fail("nao devia chamar"))
+            self.assertFalse(a.pronto)
+            self.assertFalse(a.problema("x", "teste"))
+
+    def test_token_com_espaco_e_token_recusado(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = avisos.Avisos({"TELEGRAM_BOT_TOKEN": " 123: AAb c\n"}, d, enviar=lambda m, p: {"ok": False, "description": "Unauthorized"})
+            self.assertEqual(a.token, "123:AAbc")
+            self.assertEqual((a.descobrir_chat(), a.erro), ("", "Unauthorized"))
+
+    def test_avisa_uma_vez_e_resolve(self):
+        enviados = []
+
+        def enviar(metodo, params):
+            if metodo == "getUpdates":
+                return {"ok": True, "result": [{"message": {"chat": {"id": 42, "first_name": "Paulo"}}}]}
+            enviados.append(params["text"])
+            return {"ok": True}
+
+        with tempfile.TemporaryDirectory() as d:
+            a = avisos.Avisos({"TELEGRAM_BOT_TOKEN": "T"}, d, enviar=enviar)
+            self.assertEqual(a.descobrir_chat(), "Paulo")
+            self.assertTrue(a.problema("amazon-captcha", "A Amazon pediu verificação"))
+            self.assertFalse(a.problema("amazon-captcha", "A Amazon pediu verificação"))     # nao repete
+            b = avisos.Avisos({"TELEGRAM_BOT_TOKEN": "T"}, d, enviar=enviar)                # estado guardado em arquivo
+            self.assertFalse(b.problema("amazon-captcha", "de novo"))
+            b.resolvido("amazon-captcha", "Voltou ao normal")
+            b.resolvido("amazon-captcha", "Voltou ao normal")                               # so uma vez
+        self.assertEqual(len(enviados), 2)
+        self.assertIn("⚠️", enviados[0])
+        self.assertIn("✅", enviados[1])
+
+    def test_classificacao_dos_problemas(self):
+        import robo.__main__ as principal
+        chaves = []
+
+        class Falso:
+            def problema(self, chave, texto): chaves.append(chave)
+            def resolvido(self, chave, texto): chaves.append("ok:" + chave)
+
+        principal._avisar_loja(Falso(), "amazon", ["Amazon pediu verificacao (CAPTCHA)"], 0)
+        principal._avisar_loja(Falso(), "mercadolivre", ["acesso expirou: rode 'rodar.bat entrar mercadolivre'"], 0)
+        principal._avisar_loja(Falso(), "amazon", [], 0)
+        principal._avisar_loja(Falso(), "amazon", [], 300)
+        self.assertEqual(chaves[:3], ["amazon-captcha", "mercadolivre-acesso", "amazon-vazio"])
+        self.assertEqual(chaves[3:], ["ok:amazon-captcha", "ok:amazon-acesso", "ok:amazon-vazio"])
+
+
+class Novidades(unittest.TestCase):
+    def test_carga_inicial_nao_e_novidade(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            processar(con, [item(id_loja="A")], CATALOGO, REGRAS, AGORA - timedelta(days=3))           # primeira coleta
+            processar(con, [item(id_loja="A"), item(id_loja="B", titulo="Jogo Novo Nintendo Switch 2"),
+                            item(id_loja="C", titulo="Jogo Pre Nintendo Switch 2", prevenda="Pré-venda: lançamento em 5 de dezembro")],
+                      CATALOGO, REGRAS, AGORA)
+            p = {x["id_loja"]: x for x in exportar.produtos_para_painel(con, AGORA)}
+            con.close()
+        self.assertEqual((p["A"]["novo"], p["B"]["novo"], p["C"]["novo"]), (False, True, True))
+        self.assertEqual(p["C"]["prevenda"], "Pré-venda: lançamento em 5 de dezembro")
+
+
+class LinksCurtos(unittest.TestCase):
+    def test_codigo_fixo_e_legivel(self):
+        c = links.codigo("mercadolivre", "MLB67963252")
+        self.assertEqual(c, links.codigo("mercadolivre", "MLB67963252"))
+        self.assertNotEqual(c, links.codigo("amazon", "MLB67963252"))
+        self.assertEqual(len(c), 6)
+        self.assertTrue(set(c) <= set(links.ALFABETO))
+        todos = {links.codigo("amazon", f"B0{k:08d}") for k in range(5000)}
+        self.assertEqual(len(todos), 5000)                      # sem colisao num volume realista
+
+    def test_base(self):
+        r = {"github": {"repo_painel": "pvgm91/ProjectN"}, "links_curtos": {"ativo": True, "dominio": ""}}
+        self.assertEqual(links.base(r), "https://pvgm91.github.io/ProjectN/l/")
+        r["links_curtos"]["dominio"] = "promo.projectn.com.br/"
+        self.assertEqual(links.base(r), "https://promo.projectn.com.br/l/")
+        self.assertFalse(links.ativo({"links_curtos": {"ativo": False}}))
+
+    def test_pagina_e_gerar(self):
+        destino = "https://www.mercadolivre.com.br/p/MLB1?pdp_filters=item_id%3AMLB2&matt_word=projectn&matt_tool=75936721"
+        html = links.pagina(destino, 'Jogo "Bom" <Switch>', "https://x/i.jpg")
+        self.assertIn('content="0;url=https://www.mercadolivre.com.br/p/MLB1?pdp_filters=item_id%3AMLB2&amp;matt_word=projectn', html)
+        self.assertIn("location.replace('" + destino + "')", html)
+        self.assertIn('og:title" content="Jogo &quot;Bom&quot; &lt;Switch&gt;"', html)
+        self.assertIn('og:image" content="https://x/i.jpg"', html)
+        with tempfile.TemporaryDirectory() as d:
+            c = links.gerar(d, [{"loja": "amazon", "id_loja": "B01", "destino": "https://a/1", "titulo": "A"},
+                                {"loja": "amazon", "id_loja": "B02", "destino": "", "titulo": "sem destino"}])
+            self.assertEqual(list(c), [("amazon", "B01")])
+            arq = Path(d) / "l" / (c[("amazon", "B01")] + ".html")
+            self.assertTrue(arq.exists())
+            antes = arq.stat().st_mtime_ns
+            links.gerar(d, [{"loja": "amazon", "id_loja": "B01", "destino": "https://a/1", "titulo": "A"}])
+            self.assertEqual(arq.stat().st_mtime_ns, antes)       # sem mudanca, nao reescreve
+
+    def test_texto_usa_o_link_curto(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            processar(con, [item(preco_cent=20000, original_cent=30000, url_afiliado="https://longo")], CATALOGO, REGRAS, AGORA)
+            o = db.listar_ofertas(con)
+            dados = exportar.gravar_json(o, Path(d) / "o.json", "L", "agora", {("shopee", "1"): "https://promo.projectn.com.br/l/abc234"})
+            con.close()
+        self.assertIn("👉 https://promo.projectn.com.br/l/abc234", dados["ofertas"][0]["texto"])
+        self.assertEqual(dados["ofertas"][0]["link_curto"], "https://promo.projectn.com.br/l/abc234")
+        self.assertIn("👉 https://longo", exportar.texto_do_post(o[0], "L"))
+
+
+class GitHubLote(unittest.TestCase):
+    def test_um_commit_so_com_o_que_mudou(self):
+        from robo import github
+        chamadas = []
+
+        def enviar(metodo, caminho, corpo):
+            chamadas.append((metodo, caminho, corpo))
+            if caminho.endswith("/git/ref/heads/main"):
+                return 200, {"object": {"sha": "C1"}}
+            if caminho.endswith("/git/commits/C1"):
+                return 200, {"tree": {"sha": "T1"}}
+            if "/git/trees/T1" in caminho:
+                return 200, {"tree": [{"path": "docs/index.html", "type": "blob", "sha": github.sha_git("igual".encode())},
+                                      {"path": "docs/l/a.html", "type": "blob", "sha": "velho"}]}
+            if caminho.endswith("/git/trees"):
+                return 201, {"sha": "T2"}
+            if caminho.endswith("/git/commits"):
+                return 201, {"sha": "C2"}
+            if caminho.endswith("/git/refs/heads/main"):
+                return 200, {}
+            return 404, {}
+
+        n = github.enviar_lote("t", "d/r", {"docs/index.html": "igual", "docs/l/a.html": "novo", "docs/l/b.html": "b"}, "m", enviar=enviar)
+        self.assertEqual(n, 2)
+        arvore = [c for c in chamadas if c[1].endswith("/git/trees")][0][2]
+        self.assertEqual((arvore["base_tree"], [e["path"] for e in arvore["tree"]]), ("T1", ["docs/l/a.html", "docs/l/b.html"]))
+        self.assertEqual([c for c in chamadas if c[0] == "PATCH"][0][2], {"sha": "C2"})
+        chamadas.clear()
+        self.assertEqual(github.enviar_lote("t", "d/r", {"docs/index.html": "igual"}, "m", enviar=enviar), 0)
+        self.assertFalse(any(c[0] in ("POST", "PATCH") for c in chamadas))     # nada mudou: nenhum commit
+
+    def test_dominio(self):
+        from robo import github
+        pedidos = []
+
+        def enviar(m, c, b):
+            pedidos.append((m, b))
+            return (200, {"cname": None}) if m == "GET" else (204, {})
+
+        self.assertTrue(github.definir_dominio("t", "d/r", "promo.projectn.com.br", enviar=enviar))
+        self.assertEqual(pedidos[-1], ("PUT", {"cname": "promo.projectn.com.br"}))
+        self.assertFalse(github.definir_dominio("t", "d/r", "x.com", enviar=lambda m, c, b: (200, {"cname": "x.com"})))
+
+
 class Painel(unittest.TestCase):
+    def test_pontos_do_historico(self):
+        agora = 100 * 1440
+        regs = [(10 * 1440 + 60, 500), (10 * 1440 + 600, 400), (11 * 1440, 400),     # dias antigos: menor do dia
+                (95 * 1440, 400), (95 * 1440 + 60, 400), (96 * 1440, 350), (97 * 1440, 350), (98 * 1440, 420)]
+        self.assertEqual(exportar.pontos_do_historico(regs, agora),
+                         [[10 * 1440 + 720, 400], [96 * 1440, 350], [98 * 1440, 420]])
+
+    def test_produtos_e_ofertas_no_painel(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            for dias, preco in [(5, 30000), (4, 28000), (3, 30000), (2, 30000)]:
+                processar(con, [item(id_loja="A", preco_cent=preco)], CATALOGO, REGRAS, AGORA - timedelta(days=dias))
+            processar(con, [item(id_loja="A", preco_cent=21000, original_cent=30000)], CATALOGO, REGRAS, AGORA)
+            processar(con, [item(id_loja="B", titulo="Outro Jogo Nintendo Switch 2", preco_cent=9000)], CATALOGO, REGRAS,
+                      AGORA - timedelta(days=2))
+            produtos = {p["titulo"]: p for p in exportar.produtos_para_painel(con, AGORA)}
+            a, b = produtos["Jogo Teste Nintendo Switch 2"], produtos["Outro Jogo Nintendo Switch 2"]
+            self.assertEqual((a["atual"], a["de"], a["menor"], a["maior"], a["mediana"], a["dias"]),
+                             (21000, 30000, 21000, 30000, 30000, 5))
+            self.assertEqual([p[1] for p in a["pontos"]], [30000, 28000, 30000, 21000])
+            self.assertTrue(a["ativo"])
+            self.assertFalse(b["ativo"])                      # nao apareceu na ultima coleta da loja
+            ofertas = exportar.gravar_json(db.listar_ofertas(con), Path(d) / "o.json", "L", "agora")
+            painel_dados = exportar.dados_do_painel(ofertas, list(produtos.values()), "L")
+            self.assertEqual([o["situacao"] for o in painel_dados["ofertas"]], ["valendo"])
+            # o preco volta a subir: a oferta continua na fila, mas aparece como encerrada
+            processar(con, [item(id_loja="A", preco_cent=30000)], CATALOGO, REGRAS, AGORA + timedelta(hours=1))
+            produtos = exportar.produtos_para_painel(con, AGORA + timedelta(hours=1))
+            painel_dados = exportar.dados_do_painel(ofertas, produtos, "L")
+            self.assertEqual(painel_dados["ofertas"][0]["situacao"], "subiu")
+            self.assertEqual(painel_dados["ofertas"][0]["preco_atual"], 300.0)
+            con.close()
+
     def test_pagina_embute_os_dados_com_seguranca(self):
         dados = {"gerado_em": "2026-11-12T15:00:00Z", "total": 1,
                  "ofertas": [{"titulo": "Jogo </script><b>x", "texto": "t"}]}
@@ -435,6 +728,10 @@ class AmazonPeloSite(unittest.TestCase):
         self.assertEqual(amazon_site.nome_do_vendedor("Enviado / Vendido Amazon.com.br Amazon.com.br"), ("Amazon.com.br", "oficial"))
         self.assertEqual(amazon_site.nome_do_vendedor("Vendido por Loja X"), ("Loja X", ""))
         self.assertEqual(amazon_site.nome_do_vendedor("NegociuN NegociuN  NegociuN"), ("NegociuN", ""))
+        self.assertEqual(amazon_site.limpar_titulo("Anúncio patrocinado – Suporte Grip para Switch 2"), "Suporte Grip para Switch 2")
+        self.assertEqual(amazon_site.limpar_titulo("Patrocinado: Case Switch"), "Case Switch")
+        self.assertEqual(amazon_site.limpar_titulo("Jogo patrocinado pela Nintendo"), "Jogo patrocinado pela Nintendo")
+        self.assertEqual(exportar.limpar_titulo("Anuncio patrocinado - Jogo"), "Jogo")
         self.assertEqual(amazon_site.nome_do_vendedor("Loja Boa Loja Boa"), ("Loja Boa", ""))
 
     @unittest.skipUnless(TEM_PLAYWRIGHT, "Playwright nao instalado")
@@ -521,11 +818,368 @@ class MercadoLivrePeloSite(unittest.TestCase):
                 self.assertEqual((itens[0].nota, itens[0].vendas), (4.8, 1532))
                 self.assertEqual(itens[0].parcelas, "10x de R$ 35,99 sem juros")
                 r = processar(con, itens, CATALOGO, REGRAS, AGORA)
-                self.assertEqual((r["acompanhados"], r["reprovados_reputacao"], r["ofertas_novas"]), (1, 1, 1))
+                self.assertEqual((r["acompanhados"], r["reprovados_reputacao"], r["ofertas_novas"]), (2, 0, 1))
                 self.assertFalse(db.listar_ofertas(con)[0]["url_afiliado"])
             finally:
                 con.close()
                 fonte.fechar()
+
+
+class RemoverPeloTelegram(unittest.TestCase):
+    def test_le_pedidos(self):
+        self.assertEqual(remover.ler_pedido("/start rm_123"), ("remover", [123]))
+        self.assertEqual(remover.ler_pedido("/start rm_1_2_3"), ("remover", [1, 2, 3]))
+        self.assertEqual(remover.ler_pedido("/remover 5 6"), ("remover", [5, 6]))
+        self.assertEqual(remover.ler_pedido("/start volta_7"), ("voltar", [7]))
+        self.assertIsNone(remover.ler_pedido("/start"))
+        self.assertIsNone(remover.ler_pedido("oi"))
+
+    def test_remove_so_de_quem_esta_autorizado(self):
+        class Bot:
+            def __init__(self): self.resp = []
+            def comandos(self): return [("99", "/start rm_1", "Estranho"), ("10", "/start rm_1", "Paulo")]
+            def autorizados(self): return {"10"}
+            def responder(self, chat, texto): self.resp.append((chat, texto))
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            agora = datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+            db.salvar_item(con, Item(loja="amazon", id_loja="B1", titulo="Boneco feio", preco_cent=5000), "Action figures", "", agora)
+            bot = Bot()
+            self.assertEqual(remover.processar(con, bot, agora), 1)
+            self.assertTrue(db.esta_removido(con, "amazon", "B1"))
+            self.assertIn("autorizar 99", bot.resp[0][1])
+            self.assertIn("Boneco feio", bot.resp[1][1])
+            self.assertEqual(exportar.produtos_para_painel(con, agora), [])
+            db.marcar_removido(con, 1, agora, voltar=True)
+            self.assertFalse(db.esta_removido(con, "amazon", "B1"))
+            con.close()
+
+    def test_busca_amazon_global(self):
+        from robo.fontes import amazon_site as az
+        f = az.AmazonSite.__new__(az.AmazonSite); f.base = "https://www.amazon.com.br"
+        self.assertIn("rh=p_6%3AA2EB9PYM83FCP9", f.url_busca("global:jogo nintendo switch 2", 2))
+        self.assertIn("k=jogo+nintendo+switch+2", f.url_busca("global:jogo nintendo switch 2"))
+        self.assertEqual(az.nome_do_vendedor("Enviado / Vendido Amazon Global"), ("Amazon Global", "oficial"))
+        self.assertTrue(exportar.e_importado("", "BRAVELY DEFAULT HD Remaster – Nintendo Switch 2 Edition (CAN Version)"))
+
+
+class ListaDeJogos(unittest.TestCase):
+    def test_le_plataformas_e_faz_rodizio(self):
+        with tempfile.TemporaryDirectory() as d:
+            arq = Path(d) / "jogos.txt"
+            arq.write_text("# comentario\n[Switch 2]\nMario Kart World\nDonkey Kong Bananza\n\n[Switch]\nZelda\nzelda\n", encoding="utf-8")
+            lista = jogos.ler_jogos(arq)
+            self.assertEqual(lista, [("Switch 2", "Mario Kart World"), ("Switch 2", "Donkey Kong Bananza"), ("Switch", "Zelda")])
+            self.assertEqual(jogos.consulta(*lista[0]), "Mario Kart World nintendo switch 2")
+            pos = Path(d) / "pos.json"
+            self.assertEqual(jogos.rodizio(lista, 2, pos, "amazon"), lista[:2])
+            self.assertEqual(jogos.rodizio(lista, 2, pos, "amazon"), [lista[2], lista[0]])
+            self.assertEqual(jogos.rodizio(lista, 2, pos, "mercadolivre"), lista[:2])
+            self.assertEqual(jogos.rodizio(lista, 0, pos, "amazon"), [])
+
+    def test_arquivo_do_projeto_tem_as_duas_plataformas(self):
+        lista = jogos.ler_jogos(Path(__file__).resolve().parents[1] / "config" / "jogos.txt")
+        self.assertGreaterEqual(sum(p == "Switch 2" for p, _ in lista), 90)
+        self.assertGreaterEqual(sum(p == "Switch" for p, _ in lista), 100)
+
+
+class Importados(unittest.TestCase):
+    def test_marca_importado(self):
+        self.assertTrue(exportar.e_importado("sim", "Jogo X"))
+        self.assertTrue(exportar.e_importado("", "Ys X Nordics - Nintendo Switch 2 (Importado)"))
+        self.assertTrue(exportar.e_importado("", "Bravely Default HD - Versão Americana"))
+        self.assertFalse(exportar.e_importado("", "Mario Kart World - Nintendo Switch 2"))
+        self.assertEqual(amazon_site.nome_do_vendedor("Enviado por Amazon.com Vendido por Amazon.com"), ("Amazon.com (EUA)", "oficial"))
+        self.assertEqual(amazon_site.nome_do_vendedor("Enviado / Vendido Amazon.com.br"), ("Amazon.com.br", "oficial"))
+
+    def test_importado_fica_gravado_mesmo_se_a_busca_nao_mostrar(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            agora = datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+            db.salvar_item(con, Item(loja="amazon", id_loja="B1", titulo="Ys X", preco_cent=40000, importado="sim"), "Switch 2", "", agora)
+            db.salvar_item(con, Item(loja="amazon", id_loja="B1", titulo="Ys X", preco_cent=39000), "Switch 2", "", agora)
+            self.assertEqual(con.execute("SELECT importado FROM produtos").fetchone()[0], "sim")
+            con.close()
+
+
+class OfertaRepetida(unittest.TestCase):
+    def test_nova_queda_nao_duplica_no_painel(self):
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            con.execute("INSERT INTO produtos (id, loja, id_loja, titulo) VALUES (1, 'mercadolivre', 'MLB1', 'Amiibo X')")
+            for i, preco in [(1, 28033), (2, 26300)]:
+                con.execute("INSERT INTO ofertas (id, produto_id, detectada_em, preco_cent, referencia_cent, desconto_pct, sinais, status) "
+                            "VALUES (?, 1, '2026-11-13T15:00:00Z', ?, 49899, 40, '[]', 'nova')", (i, preco))
+            self.assertEqual([o["preco_cent"] for o in db.listar_ofertas(con)], [26300])
+            con.close()
+
+
+class VitrineECuponsDoSiteML(unittest.TestCase):
+    LOJAS = {"5622": "Gamer Hut"}
+    AF = {"matt_word": "projectn", "matt_tool": "75936721"}
+
+    def test_card_da_gamer_hut_vira_item_com_afiliado(self):
+        i = mercadolivre_site.converter({"titulo": "Sonic Racing CrossWorlds Switch", "preco": 13590, "de": 29990,
+                                         "vendedor": "Por Gamer Hut",
+                                         "url": "https://www.mercadolivre.com.br/jogo-sonic/p/MLB54245130?pdp_filters=official_store%3A5622%7Citem_id%3AMLB4201389169#polycard"},
+                                        self.LOJAS, self.AF)
+        self.assertEqual((i.id_loja, i.vendedor, i.selo, i.original_cent), ("MLB54245130", "Gamer Hut", "oficial", 29990))
+        self.assertEqual(i.url, "https://www.mercadolivre.com.br/jogo-sonic/p/MLB54245130?pdp_filters=item_id%3AMLB4201389169")
+        self.assertIn("matt_tool=75936721", i.url_afiliado)
+        self.assertEqual(mercadolivre_site.nome_da_loja("Vendido por GAMER HUT", self.LOJAS), "Gamer Hut")
+        self.assertEqual(mercadolivre_site.nome_da_loja("Por Outra Loja", self.LOJAS), "")
+
+    def test_so_lojas_descarta_outros_vendedores(self):
+        class Falsa(mercadolivre_site.MercadoLivreSite):
+            def buscar_bruto(self, palavra, pagina=1, por_pagina=0):
+                return {"itens": [{"titulo": "A", "preco": 5000, "vendedor": "Por Gamer Hut", "url": "https://produto.mercadolivre.com.br/MLB-1-a"},
+                                  {"titulo": "B", "preco": 5000, "vendedor": "Por Outra", "url": "https://produto.mercadolivre.com.br/MLB-2-b"}]}
+        f = Falsa({}, None, pausa=None, lojas=self.LOJAS, so_lojas=True)
+        self.assertEqual([i.id_loja for i in f.buscar("switch game hut", 2)], ["MLB1"])
+        self.assertTrue(f.url_busca("switch game hut", 2).endswith("/switch-game-hut_Desde_49_NoIndex_True"))
+
+    def test_regra_oficial_confirma_e_corrige_validade(self):
+        quando = datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+        r = cupons._regras("R$ 20 OFF em compras acima de R$ 150. Vence em 30 de novembro", quando)
+        self.assertEqual((r["desconto_cent"], r["minimo_cent"], r["validade"]), (2000, 15000, "2026-11-30"))
+        with tempfile.TemporaryDirectory() as d:
+            con = db.conectar(Path(d) / "t.db")
+            db.salvar_cupom(con, {"codigo": "GAMER20", "loja": "mercadolivre", "desconto_pct": 0, "desconto_cent": 2000, "minimo_cent": 0,
+                                  "teto_cent": 0, "validade": "", "texto": "t"}, "Canal", quando)
+            db.confirmar_cupom(con, "GAMER20", "mercadolivre", "texto oficial", r, quando)
+            c = db.listar_cupons(con, quando)[0]
+            self.assertEqual((c["minimo_cent"], c["validade"], c["regra_oficial"], bool(c["confirmado_em"])),
+                             (15000, "2026-11-30", "texto oficial", True))
+            con.close()
+
+    @unittest.skipUnless(TEM_PLAYWRIGHT, "Playwright nao instalado")
+    def test_acha_o_cartao_do_cupom_na_pagina(self):
+        html = ("<html><body><main><div class='c'><h3>R$ 20 OFF</h3><p>Em compras acima de R$ 150</p><p>Vence em 30 de novembro</p>"
+                "<span>GAMER20</span></div><div class='c'><span>OUTRO10</span><p>10% OFF valido ate 20/11</p></div></main></body></html>")
+        with tempfile.TemporaryDirectory() as d:
+            pag = Path(d) / "cupons.html"
+            pag.write_text(html, encoding="utf-8")
+            nav = Navegador(Path(d) / "perfil", canais=(None, "msedge", "chrome"))
+            try:
+                nav.ir(pag.as_uri())
+                r = nav.avaliar_com(mercadolivre_site.JS_CUPONS, ["GAMER20", "NAOEXISTE"])
+            finally:
+                nav.fechar()
+        self.assertEqual(list(r["achados"]), ["GAMER20"])
+        self.assertIn("acima de R$ 150", r["achados"]["GAMER20"])
+        self.assertNotIn("OUTRO10", r["achados"]["GAMER20"])
+        self.assertFalse(r["login"])
+
+
+ENV_ML = {"MERCADOLIVRE_APP_ID": "123", "MERCADOLIVRE_SECRET": "seg"}
+ANUNCIO_ML = {"id": "MLB111", "title": "Jogo Ficticio Nintendo Switch 2", "price": 359.91, "original_price": 449.9,
+              "permalink": "https://produto.mercadolivre.com.br/MLB-111", "thumbnail": "http://http2.mlstatic.com/D_1-I.jpg",
+              "official_store_id": 77, "seller": {"id": 9, "nickname": "LOJA OFICIAL"},
+              "installments": {"quantity": 10, "amount": 35.99, "rate": 0}}
+
+
+class MercadoLivreAPI(unittest.TestCase):
+    def test_converter_anuncio(self):
+        i = mercadolivre.converter_anuncio(ANUNCIO_ML)
+        self.assertEqual((i.id_loja, i.preco_cent, i.original_cent, i.selo, i.vendedor, i.parcelas),
+                         ("MLB111", 35991, 44990, "oficial", "LOJA OFICIAL", "10x de R$ 35,99 sem juros"))
+        self.assertEqual(i.imagem, "https://http2.mlstatic.com/D_1-O.jpg")
+        self.assertEqual(mercadolivre._parcelas({"quantity": 12, "amount": 1234.5, "rate": 2.1}), "12x de R$ 1.234,50")
+        self.assertIsNone(mercadolivre.converter_anuncio({"id": "X", "title": "t", "price": None}))
+
+    def test_sem_credenciais(self):
+        with self.assertRaises(SemCredenciais):
+            mercadolivre.MercadoLivre({})
+
+    def _api_catalogo(self, produtos_busca, vendedores, chamadas=None):
+        """Simula a API como ela responde hoje: busca de anuncios e /items fechados, catalogo aberto."""
+        def enviar(m, url, corpo, cab):
+            if chamadas is not None:
+                chamadas.append(url.split("?")[0].replace("https://api.mercadolibre.com", ""))
+            if url.endswith("/oauth/token"):
+                return 200, {"access_token": "T"}
+            if "/sites/MLB/search" in url or "/items?" in url:
+                return 403, {"message": "forbidden"}
+            if "/products/search" in url:
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["q"][0]
+                return 200, {"results": produtos_busca.get(q, [])}
+            for pid, v in vendedores.items():
+                if url.endswith(f"/products/{pid}/items"):
+                    return (200, {"results": v}) if v else (404, {"message": "No winners found"})
+                if url.endswith(f"/products/{pid}"):
+                    return 200, {"id": pid, "name": f"Produto {pid} Nintendo Switch", "pictures": [{"url": "https://x/p.jpg"}]}
+            return 404, {}
+        return enviar
+
+    def test_coleta_pelo_catalogo(self):
+        busca = {"switch": [{"id": "MLB900", "name": "Jogo Catalogo Nintendo Switch 2", "pictures": [{"url": "https://x/1.jpg"}]},
+                            {"id": "MLB901", "name": "Jogo Sem Vendedor Switch"},
+                            {"id": "MLB902", "name": "Jogo Usado Switch"}],
+                 "lego": [{"id": "MLB900", "name": "Jogo Catalogo Nintendo Switch 2"}]}
+        vendedores = {"MLB900": [{"item_id": "a", "price": 300, "seller_id": 1, "condition": "new"},
+                                 {"item_id": "b", "price": 320, "original_price": 400, "seller_id": 2, "official_store_id": 5,
+                                  "condition": "new", "installments": {"quantity": 10, "amount": 32, "rate": 0}}],
+                      "MLB901": [], "MLB902": [{"price": 50, "condition": "used"}]}
+        af = {"matt_word": "projectn", "matt_tool": "75936721"}
+        f = mercadolivre.MercadoLivre(ENV_ML, enviar=self._api_catalogo(busca, vendedores), pausa=0,
+                                      buscas=["switch", "lego"], afiliado=af)
+        itens = f.coletar()
+        self.assertEqual([(i.id_loja, i.preco_cent, i.original_cent, i.selo, i.parcelas) for i in itens],
+                         [("MLB900", 32000, 40000, "oficial", "10x de R$ 32,00 sem juros")])    # sem repetir; usado e sem vendedor fora
+        self.assertEqual(itens[0].url_afiliado,
+                         "https://www.mercadolivre.com.br/p/MLB900?pdp_filters=item_id%3Ab&matt_word=projectn&matt_tool=75936721")
+        self.assertEqual(itens[0].imagem, "https://x/1.jpg")
+
+    def test_loja_preferida(self):
+        busca = {"sonic": [{"id": "MLB500", "name": "Sonic Racing CrossWorlds Nintendo Switch 2"}]}
+        vendedores = {"MLB500": [{"item_id": "MLB1", "price": 120, "condition": "new"},
+                                 {"item_id": "MLB2", "price": 129, "condition": "new", "official_store_id": 99},
+                                 {"item_id": "MLB3", "price": 135, "original_price": 299.9, "condition": "new", "official_store_id": 5622}]}
+        f = mercadolivre.MercadoLivre(ENV_ML, enviar=self._api_catalogo(busca, vendedores), pausa=0, buscas=["sonic"],
+                                      lojas={"5622": "Gamer Hut"})
+        i = f.coletar()[0]
+        self.assertEqual((i.preco_cent, i.original_cent, i.vendedor, i.selo), (13500, 29990, "Gamer Hut", "oficial"))
+        self.assertEqual(i.url, "https://www.mercadolivre.com.br/p/MLB500?pdp_filters=item_id%3AMLB3")
+        sem = mercadolivre.MercadoLivre(ENV_ML, enviar=self._api_catalogo(busca, vendedores), pausa=0, buscas=["sonic"])
+        self.assertEqual((sem.coletar()[0].preco_cent, sem.coletar()[0].vendedor), (12900, ""))     # sem loja cadastrada: oficial mais barata
+
+    def test_paginacao_e_produto_sem_vendedor(self):
+        paginas = []
+        todos = [{"id": f"MLB{100 + k}", "name": f"Jogo {k} Nintendo Switch"} for k in range(70)]
+
+        def enviar(m, url, corpo, cab):
+            if url.endswith("/oauth/token"):
+                return 200, {"access_token": "T"}
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+            if "/products/search" in url:
+                ini, lim = int(q["offset"][0]), int(q["limit"][0])
+                paginas.append((ini, lim))
+                return 200, {"paging": {"total": 70}, "results": todos[ini:ini + lim]}
+            pid = url.split("/products/")[1].split("/")[0]
+            return (404, {}) if int(pid[3:]) % 2 else (200, {"results": [{"price": 100, "condition": "new"}]})
+
+        with tempfile.TemporaryDirectory() as d:
+            cache = Path(d) / "c.json"
+            f = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, cache=cache, buscas=["a", "b"], por_busca=60)
+            itens = f.coletar()
+            self.assertEqual(paginas, [(0, 50), (50, 10), (0, 50), (50, 10)])
+            self.assertEqual(len(itens), 30)                         # 60 lidos; metade sem vendedor; "b" repete os mesmos
+            self.assertEqual(len(json.loads(cache.read_text())["__sem_vendedor__"]), 30)
+            consultas = []
+            f._enviar = lambda m, u, c, h: (consultas.append(u) or enviar(m, u, c, h))
+            f.coletar()                                              # sem vendedor: pulados por 24h
+            self.assertEqual(sum("/items" in u for u in consultas), 30)
+
+    def test_resposta_parcial_e_erro_isolado(self):
+        def enviar(m, url, corpo, cab):
+            if url.endswith("/oauth/token"):
+                return 200, {"access_token": "T"}
+            if "/products/search" in url:
+                return 206, {"results": [{"id": "MLB1", "name": "A Switch"}, {"id": "MLB2", "name": "B Switch"}, {"id": "MLB3", "name": "C Switch"}]}
+            if url.endswith("/products/MLB1/items"):
+                return 206, {"results": [{"price": 100, "condition": "new"}]}      # parcial, mas com preco
+            if url.endswith("/products/MLB2/items"):
+                return 500, {"message": "erro interno"}                              # so este falha
+            return 200, {"results": [{"price": 300, "condition": "new"}]}
+
+        f = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, buscas=["x"])
+        itens = f.coletar()
+        self.assertEqual(([i.id_loja for i in itens], f.falhas), (["MLB1", "MLB3"], 1))
+        bloqueado = mercadolivre.MercadoLivre(ENV_ML, pausa=0, buscas=["x"],
+            enviar=lambda m, u, c, h: (200, {"access_token": "T"}) if u.endswith("/token") else
+                   (200, {"results": [{"id": "MLB1"}]}) if "/search" in u else (403, {"message": "forbidden"}))
+        with self.assertRaises(ErroDaFonte):
+            bloqueado.coletar()
+
+    def test_lista_de_acompanhamento(self):
+        with tempfile.TemporaryDirectory() as d:
+            lista = Path(d) / "lista.txt"
+            lista.write_text("# comentario\n"
+                             "Console https://www.mercadolivre.com.br/console/p/MLB65522892?pdp_filters=item_id%3AMLB7692524458#x=1&wid=MLB7692524458\n"
+                             "  https://mercadolivre.com/sec/abc12  \n"
+                             "https://produto.mercadolivre.com.br/MLB-111-jogo-_JM\n"
+                             "https://www.mercadolivre.com.br/console/p/MLB65522892\n"
+                             "texto sem link\n", encoding="utf-8")
+            self.assertEqual(mercadolivre.codigo_do_link("https://www.mercadolivre.com.br/x/p/MLB900?a=1"), ("catalogo", "MLB900"))
+            self.assertEqual(mercadolivre.codigo_do_link("https://x/console/p/MLB65522892?pdp_filters=item_id%3AMLB7692524458"),
+                             ("catalogo", "MLB65522892"))                         # catalogo primeiro: e o que a API le
+            self.assertEqual(mercadolivre.codigo_do_link("https://produto.mercadolivre.com.br/MLB-111-x"), ("anuncio", "MLB111"))
+            self.assertFalse(mercadolivre.e_link_de_afiliado("https://www.mercadolivre.com.br/console/p/MLB65522892?pdp_filters=x"))
+            af = {"matt_word": "projectn", "matt_tool": "75936721"}
+            self.assertEqual(mercadolivre.com_afiliado("https://produto.mercadolivre.com.br/MLB-111-jogo-_JM#pos=1", af),
+                             "https://produto.mercadolivre.com.br/MLB-111-jogo-_JM?matt_word=projectn&matt_tool=75936721")
+            self.assertEqual(mercadolivre.com_afiliado("https://x.com.br/p/MLB9?a=1&matt_tool=1", af), "https://x.com.br/p/MLB9?a=1&matt_tool=1")
+            self.assertEqual(mercadolivre.com_afiliado("https://x.com.br/p/MLB9", {}), "https://x.com.br/p/MLB9")
+            resolvidos = []
+
+            def resolver(url):
+                resolvidos.append(url)
+                return "https://www.mercadolivre.com.br/controle/p/MLB777?matt_tool=1"
+
+            vendedores = {"MLB65522892": [{"price": 4199, "original_price": 4999, "condition": "new"}],
+                          "MLB777": [{"price": 199.9, "condition": "new", "official_store_id": 1}]}
+            cache = Path(d) / "cache.json"
+            busca = {"switch": [{"id": "MLB65522892", "name": "Console Nintendo Switch 2"}]}
+            f = mercadolivre.MercadoLivre(ENV_ML, enviar=self._api_catalogo(busca, vendedores), pausa=0, lista=lista, cache=cache,
+                                          resolver=resolver, afiliado=af, buscas=["switch"])
+            itens = f.coletar()
+            self.assertEqual([(i.id_loja, i.preco_cent, i.selo, i.url_afiliado) for i in itens],
+                             [("MLB65522892", 419900, "lista", "https://www.mercadolivre.com.br/p/MLB65522892?matt_word=projectn&matt_tool=75936721"),
+                              ("MLB777", 19990, "oficial", "https://mercadolivre.com/sec/abc12")])
+            self.assertEqual(f.ignorados, ["https://produto.mercadolivre.com.br/MLB-111-jogo-_JM"])   # anuncio solto: API nao le
+            f.coletar()
+            self.assertEqual(resolvidos, ["https://mercadolivre.com/sec/abc12"])                       # cache: resolvido uma vez
+            con = db.conectar(Path(d) / "t.db")
+            r = processar(con, itens, CATALOGO, REGRAS, AGORA)
+            self.assertEqual((r["reprovados_reputacao"], r["acompanhados"]), (0, 2))     # lista passa sem loja oficial
+            con.close()
+
+    def test_diagnostico(self):
+        f = mercadolivre.MercadoLivre(ENV_ML, enviar=self._api_catalogo({"x": [{"id": "MLB1"}]}, {"MLB1": []}), pausa=0)
+        d = f.diagnosticar("x")
+        self.assertEqual((d["acesso"], d["busca"]["status"], d["catalogo"]["status"], d["catalogo_itens"]["status"]),
+                         ("aplicacao", 403, 200, 404))
+
+    def test_autorizacao_da_conta_e_renovacao(self):
+        pedidos = []
+
+        def enviar(m, url, corpo, cab):
+            if url.endswith("/oauth/token"):
+                pedidos.append(corpo["grant_type"])
+                if corpo["grant_type"] == "authorization_code":
+                    self.assertEqual((corpo["code"], corpo["redirect_uri"]), ("TG-abc", "https://www.projectn.com.br"))
+                    return 200, {"access_token": "U1", "refresh_token": "R1", "expires_in": 21600, "user_id": 42}
+                if corpo["grant_type"] == "refresh_token":
+                    self.assertEqual(corpo["refresh_token"], "R1")
+                    return 200, {"access_token": "U2", "refresh_token": "R2", "expires_in": 21600}
+                return 200, {"access_token": "APP"}
+            return 200, {"results": [ANUNCIO_ML], "usado": cab["Authorization"]}
+
+        with tempfile.TemporaryDirectory() as d:
+            arq = Path(d) / "ml_token.json"
+            f = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, arquivo_token=arq)
+            self.assertIn("client_id=123", f.url_autorizacao())
+            self.assertIn("redirect_uri=https%3A%2F%2Fwww.projectn.com.br", f.url_autorizacao())
+            f.autorizar("https://www.projectn.com.br/?code=TG-abc&state=")
+            self.assertEqual(json.loads(arq.read_text())["refresh_token"], "R1")
+            f2 = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, arquivo_token=arq)
+            self.assertEqual((f2.token(), f2.tipo_token), ("U1", "conta"))
+            dados = json.loads(arq.read_text()); dados["expira"] = 0; arq.write_text(json.dumps(dados))
+            f3 = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, arquivo_token=arq)
+            self.assertEqual(f3.token(), "U2")                         # renovou sozinho
+            self.assertEqual(json.loads(arq.read_text())["refresh_token"], "R2")
+            sem_conta = mercadolivre.MercadoLivre(ENV_ML, enviar=enviar, pausa=0, arquivo_token=Path(d) / "nao.json")
+            self.assertEqual((sem_conta.token(), sem_conta.tipo_token), ("APP", "aplicacao"))
+        self.assertEqual(pedidos, ["authorization_code", "refresh_token", "client_credentials"])
+        with self.assertRaises(ErroDaFonte):
+            f.autorizar("https://www.projectn.com.br/")
+
+    def test_credencial_recusada(self):
+        f = mercadolivre.MercadoLivre(ENV_ML, enviar=lambda m, u, c, h: (400, {"message": "invalid client_id or client_secret"}), pausa=0)
+        with self.assertRaises(ErroDaFonte) as e:
+            f.buscar("x")
+        self.assertIn("invalid client_id", str(e.exception))
+        self.assertNotIn("seg", str(e.exception))
 
 
 class Fluxo(unittest.TestCase):
@@ -584,7 +1238,7 @@ class Fluxo(unittest.TestCase):
         o = db.listar_ofertas(self.con)[0]
         s = json.loads(o["sinais"])[0]
         self.assertEqual((s["tipo"], s["pct"]), ("historico", 20.0))
-        self.assertIn("menor preco em 8 dias", s["texto"])
+        self.assertIn("menor preço em 8 dias", s["texto"])
 
     def test_entre_lojas_com_produto_cadastrado(self):
         c = dict(CATALOGO, produtos=[{"chave": "jt", "termos": ["jogo teste"], "preco_sugerido_reais": 0}])

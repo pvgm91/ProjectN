@@ -12,7 +12,7 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com"
-EXTENSOES = {".py", ".json", ".md", ".bat", ".html", ".example", ".gitignore", ".gitkeep", ".txt"}
+EXTENSOES = {".py", ".json", ".md", ".bat", ".html", ".example", ".gitignore", ".gitkeep", ".txt", ".png"}
 PASTAS_FORA = {"__pycache__", ".git", ".venv", ".idea", "perfil_navegador", "dados"}
 
 
@@ -125,3 +125,46 @@ def preparar_pagina(token, repo, pasta="", enviar=None):
         raise ErroGitHub(f"nao foi possivel ligar o GitHub Pages (HTTP {status}: {resp.get('message', '')}). "
                          f"Ligue a mao em https://github.com/{repo}/settings/pages (branch main, pasta /{pasta})")
     return feito
+
+
+def enviar_lote(token, repo, textos, mensagem, ramo="main", enviar=None):
+    """Envia varios arquivos de texto num commit so; so os que mudaram. Devolve quantos mudaram.
+
+    textos = {caminho_no_repositorio: conteudo (str)}.
+    """
+    st, ref = _chamar(token, "GET", f"/repos/{repo}/git/ref/heads/{ramo}", enviar=enviar)
+    if st != 200:
+        raise ErroGitHub(f"nao foi possivel ler o repositorio {repo} (HTTP {st}: {ref.get('message', '')})")
+    commit_sha = ref["object"]["sha"]
+    st, commit = _chamar(token, "GET", f"/repos/{repo}/git/commits/{commit_sha}", enviar=enviar)
+    arvore_sha = commit["tree"]["sha"]
+    st, arvore = _chamar(token, "GET", f"/repos/{repo}/git/trees/{arvore_sha}?recursive=1", enviar=enviar)
+    remotos = {n["path"]: n["sha"] for n in arvore.get("tree", []) if n.get("type") == "blob"}
+    mudados = [{"path": c, "mode": "100644", "type": "blob", "content": t}
+               for c, t in sorted(textos.items()) if remotos.get(c) != sha_git(t.encode("utf-8"))]
+    if not mudados:
+        return 0
+    st, nova = _chamar(token, "POST", f"/repos/{repo}/git/trees", {"base_tree": arvore_sha, "tree": mudados}, enviar=enviar)
+    if st != 201:
+        raise ErroGitHub(f"nao foi possivel montar o envio (HTTP {st}: {nova.get('message', '')})")
+    st, novo = _chamar(token, "POST", f"/repos/{repo}/git/commits",
+                       {"message": mensagem, "tree": nova["sha"], "parents": [commit_sha]}, enviar=enviar)
+    if st != 201:
+        raise ErroGitHub(f"nao foi possivel criar o commit (HTTP {st}: {novo.get('message', '')})")
+    st, r = _chamar(token, "PATCH", f"/repos/{repo}/git/refs/heads/{ramo}", {"sha": novo["sha"]}, enviar=enviar)
+    if st != 200:
+        raise ErroGitHub(f"nao foi possivel atualizar o ramo {ramo} (HTTP {st}: {r.get('message', '')})")
+    return len(mudados)
+
+
+def definir_dominio(token, repo, dominio, enviar=None):
+    """Garante o dominio proprio no GitHub Pages. Erro aqui so avisa: o CNAME no repositorio ja basta."""
+    st, atual = _chamar(token, "GET", f"/repos/{repo}/pages", enviar=enviar)
+    if st == 200 and (atual.get("cname") or "") == dominio:
+        return False
+    st, r = _chamar(token, "PUT", f"/repos/{repo}/pages", {"cname": dominio}, enviar=enviar)
+    if st not in (200, 204):
+        print(f"[aviso] nao consegui definir o dominio {dominio} no GitHub Pages (HTTP {st}); "
+              f"defina em https://github.com/{repo}/settings/pages")
+        return False
+    return True

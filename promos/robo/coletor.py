@@ -22,8 +22,12 @@ def processar(con, itens, catalogo, regras, agora, verificador=None, max_verific
             continue
         vistos.add(chave_item)
         resumo["recebidos"] += 1
+        if db.esta_removido(con, item.loja, item.id_loja):     # voce tirou este produto pelo painel
+            continue
 
         categoria = item.categoria or cat.classificar(item.titulo, catalogo)
+        if not categoria and item.selo == "lista":     # escolhido a dedo: entra mesmo fora das palavras do catalogo
+            categoria = "Nintendo"
         if not categoria:
             resumo["fora_do_catalogo"] += 1
             continue

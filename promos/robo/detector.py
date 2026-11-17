@@ -17,7 +17,7 @@ def sinal_desconto_loja(preco, original, regras):
     pct = _pct_abaixo(preco, original)
     if pct >= regras["sinais"]["desconto_loja_min_pct"]:
         return {"tipo": "desconto_loja", "pct": pct, "referencia_cent": original,
-                "texto": f"{pct:.0f}% abaixo do preco 'de' da loja"}
+                "texto": f"{pct:.0f}% abaixo do preço 'de' da loja"}
     return None
 
 
@@ -26,7 +26,7 @@ def sinal_preco_sugerido(preco, sugerido, regras):
     pct = _pct_abaixo(preco, sugerido)
     if pct >= regras["sinais"]["abaixo_do_sugerido_min_pct"]:
         return {"tipo": "preco_sugerido", "pct": pct, "referencia_cent": sugerido,
-                "texto": f"{pct:.0f}% abaixo do preco sugerido"}
+                "texto": f"{pct:.0f}% abaixo do preço sugerido"}
     return None
 
 
@@ -56,7 +56,7 @@ def sinal_historico(preco, minimos_diarios, regras):
         return None
     texto = f"{pct:.0f}% abaixo da mediana de {dias} dias"
     if preco <= min(minimos_diarios):
-        texto = f"menor preco em {dias} dias ({pct:.0f}% abaixo da mediana)"
+        texto = f"menor preço em {dias} dias ({pct:.0f}% abaixo da mediana)"
     return {"tipo": "historico", "pct": pct, "referencia_cent": referencia, "texto": texto}
 
 

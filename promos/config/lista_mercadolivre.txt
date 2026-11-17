@@ -1,0 +1,11 @@
+# Produtos do Mercado Livre que o robo acompanha de hora em hora.
+#
+# Cole UM link por linha. Pode ser:
+#   - o link de afiliado (ex.: https://mercadolivre.com/sec/xxxxxx)  <- melhor: o post ja sai com ele
+#   - o link normal do anuncio (ex.: https://produto.mercadolivre.com.br/MLB-1234567890-...)
+#   - o link de produto de catalogo (ex.: https://www.mercadolivre.com.br/.../p/MLB12345678)
+# Linhas que comecam com # sao ignoradas. Depois de colar, salve e rode: rodar.bat testar mercadolivre
+#
+
+Console Nintendo Switch 2 + Mario Kart World Bundle Preto https://www.mercadolivre.com.br/console-nintendo-switch-2-mario-kart-world-bundle-preto/p/MLB65522892?pdp_filters=item_id%3AMLB7692524458#polycard_client=search-desktop&be_origin=searchv2&overlay_label=not_apply&search_layout=grid&position=1&type=product&tracking_id=9294bf88-9d88-4f3f-9b9d-07ef13954b7f&overlay_label_capability=not_apply&wid=MLB7692524458&sid=search
+Sonic Racing CrossWorlds Switch (Gamer Hut) https://www.mercadolivre.com.br/jogo-sonic-racing-crossworlds-launch-edition-switch-fisico/p/MLB54245130?pdp_filters=official_store%3A5622%7Citem_id%3AMLB4201389169
