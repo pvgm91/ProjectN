@@ -42,7 +42,8 @@
   "_leia_jogos": "Jogos de config/jogos.txt procurados pelo nome. jogos_por_ciclo = quantos da fila cada loja procura por coleta (rodizio). Amazon baixo para nao pedir CAPTCHA.",
   "jogos_por_ciclo": {
     "amazon": 24,
-    "mercadolivre": 100
+    "mercadolivre": 100,
+    "shopee": 60
   },
   "resultados_por_jogo": 10,
   "preco_minimo_reais": 30,
