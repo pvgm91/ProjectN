@@ -470,7 +470,7 @@ function iniciarPainel(D) {
     if (p.de > p.atual) L.push("De ~" + R(p.de) + "~ por *" + R(p.atual) + "*" + v + " (" + pctAbaixo(p.atual, p.de) + "% off)");
     else L.push("Por *" + R(p.atual) + "*" + v);
     if (p.parcelas) L.push((v ? "💳 Ou em até " : "💳 Em até ") + p.parcelas);
-    if (p.vendedor) L.push("📦 Vendido por " + p.vendedor + (p.selo === "oficial" ? " (loja oficial)" : ""));
+    if (p.vendedor) L.push("📦 Vendido por " + p.vendedor + (p.selo === "oficial" ? " (loja oficial)" : p.selo === "amazon" ? " (entregue pela Amazon)" : ""));
     if (p.importado) L.push("✈️ Produto importado, com envio internacional");
     L.push("", "👉 " + (p.link_curto || p.url), "", "📢 Entre no grupo de promoções do Project N:\n" + D.link_grupo);
     return L.join("\n");

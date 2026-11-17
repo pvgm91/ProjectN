@@ -105,7 +105,7 @@ def texto_do_post(o, link_grupo, link=""):
     if linha_validade(o["validade"]):
         linhas.append(linha_validade(o["validade"]))
     if o["vendedor"] and o["loja"] != "eshop":
-        selo = {"oficial": " (loja oficial)", "indicada": " (loja indicada)"}.get(o["selo"], "")
+        selo = {"oficial": " (loja oficial)", "indicada": " (loja indicada)", "amazon": " (entregue pela Amazon)"}.get(o["selo"], "")
         linhas.append(f"📦 Vendido por {o['vendedor']}{selo}")
     if e_importado(o["importado"] if "importado" in o.keys() else "", o["titulo"]):
         linhas.append(LINHA_IMPORTADO)

@@ -51,9 +51,12 @@ JS_PRODUTO = r"""() => {
     return m ? m[1].trim().slice(0, 90) : ''; };
   const vendedor = txt('#merchantInfoFeature_feature_div') ||
     [...document.querySelectorAll('[offer-display-feature-name="desktop-merchant-info"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).join(' ');
+  const entrega = txt('#fulfillerInfoFeature_feature_div') ||
+    [...document.querySelectorAll('[offer-display-feature-name="desktop-fulfiller-info"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).join(' ');
   return {
     captcha: !!document.querySelector('form[action*="validateCaptcha"]'),
     vendedor: vendedor,
+    entrega: entrega,
     preco: num(txt('#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen') || txt('#corePriceDisplay_desktop_feature_div .a-price .a-offscreen') || txt('.priceToPay')),
     de: num(txt('#corePriceDisplay_desktop_feature_div .basisPrice .a-offscreen') || txt('.basisPrice .a-offscreen')),
     parcelas: parcelas((document.querySelector('#apex_desktop, #corePriceDisplay_desktop_feature_div') || {}).innerText),
@@ -89,6 +92,11 @@ def converter(no, tag=""):
 
 AMAZON_GLOBAL = "A2EB9PYM83FCP9"      # codigo de vendedor da Amazon Global (importados com taxas incluidas)
 PREFIXO_GLOBAL = "global:"            # busca em config/catalogo.json com esse prefixo = so Amazon Global
+
+
+def entregue_pela_amazon(texto):
+    """'Enviado por Amazon.com.br' -> True. Vendedor parceiro com estoque e entrega da Amazon."""
+    return "amazon" in (texto or "").lower()
 
 
 def nome_do_vendedor(texto):
@@ -164,6 +172,8 @@ class AmazonSite:
         self._esperar()
         vendedor, selo = nome_do_vendedor(d.get("vendedor") or "")
         novo = Item(**item.__dict__)
+        if not selo and entregue_pela_amazon(d.get("entrega")):
+            selo = "amazon"      # vendido por parceiro, mas guardado e entregue pela Amazon
         novo.vendedor, novo.selo = vendedor, selo
         if d.get("preco"):
             novo.preco_cent = d["preco"]

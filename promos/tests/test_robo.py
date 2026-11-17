@@ -733,6 +733,10 @@ class AmazonPeloSite(unittest.TestCase):
         self.assertEqual(amazon_site.limpar_titulo("Jogo patrocinado pela Nintendo"), "Jogo patrocinado pela Nintendo")
         self.assertEqual(exportar.limpar_titulo("Anuncio patrocinado - Jogo"), "Jogo")
         self.assertEqual(amazon_site.nome_do_vendedor("Loja Boa Loja Boa"), ("Loja Boa", ""))
+        self.assertTrue(amazon_site.entregue_pela_amazon("Enviado por Amazon.com.br"))
+        self.assertTrue(amazon_site.entregue_pela_amazon("Enviado por Amazon"))
+        self.assertFalse(amazon_site.entregue_pela_amazon("Enviado por Loja X"))
+        self.assertFalse(amazon_site.entregue_pela_amazon(""))
 
     @unittest.skipUnless(TEM_PLAYWRIGHT, "Playwright nao instalado")
     def test_navegador_de_verdade_em_paginas_ficticias(self):
